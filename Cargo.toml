@@ -5,8 +5,7 @@ edition = "2021"
 authors = ["knewjade"]
 
 [dependencies]
-#bitris = { git = "https://github.com/knewjade/bitris", branch = "develop" }
-bitris = { path = "../bitris" }
+bitris = { git = "https://github.com/knewjade/bitris.git", branch = "main" }
 itertools = "0.10.5"
 bitvec = "1.0.1"
 fxhash = "0.2.1"

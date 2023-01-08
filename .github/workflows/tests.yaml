@@ -1,0 +1,13 @@
+on: [ push ]
+name: tests
+jobs:
+  build_and_test:
+    name: run unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: run tests for core
+        run: cargo test --release
