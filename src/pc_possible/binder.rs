@@ -16,19 +16,21 @@ pub struct PcPossibleExecutorBinder<T: RotationSystem> {
 }
 
 impl PcPossibleExecutorBinder<SrsKickTable> {
+    /// Making the executor with SRS. See `PcPossibleExecutorBinder::default()` for more details.
     pub fn srs(move_type: MoveType) -> Self {
-        Self {
-            move_rules: MoveRules::srs(move_type),
-            clipped_board: ClippedBoard::try_new(Board64::blank(), 4).unwrap(),
-            pattern: Rc::from(Pattern::new(vec![
-                PatternElement::Factorial(ShapeCounter::one_of_each()),
-            ])),
-            allows_hold: true,
-        }
+        PcPossibleExecutorBinder::default(MoveRules::srs(move_type))
     }
 }
 
 impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
+    /// Making the executor with default.
+    ///
+    /// The default values are as follows:
+    ///   + move rules: from argument
+    ///   + board: Blank
+    ///   + height: 4 lines
+    ///   + pattern: Factorial of all shapes (like `*p7`)
+    ///   + allows hold: yes
     pub fn default(move_rules: MoveRules<T>) -> Self {
         Self {
             move_rules,

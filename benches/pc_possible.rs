@@ -21,9 +21,9 @@ fn pc_possible(data: &PcPossibleBenchmarkData) {
 struct PcPossibleBenchmarkData {
     id: String,
     board: Board64,
+    height: u32,
     patterns: Rc<Pattern>,
     expected: usize,
-    height: u32,
 }
 
 fn bench_pc_possibles(c: &mut Criterion) {

@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 bitris_commands = { path = ".." }
+
+[profile.test]
+opt-level = 3
+debug = false

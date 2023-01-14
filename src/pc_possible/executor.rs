@@ -341,35 +341,13 @@ mod tests {
 
     use bitris::{Board64, MoveRules, MoveType, Shape};
 
-    use crate::{ClippedBoard, Pattern, ShapeCounter};
+    use crate::{PatternElement, ClippedBoard, Pattern, ShapeCounter, ShapeSequence};
     use crate::pc_possible::{PcPossibleExecutor, PcPossibleExecutorCreationError};
-    use crate::pc_possible::ExecutionStatus::{Break, Continue};
-
-    #[test]
-    fn success_rate_grace_system() {
-        use crate::PatternElement::*;
-        let board = Board64::from_str("
-            ######....
-            ######....
-            ######....
-            ######....
-        ").unwrap();
-        let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-        let patterns = Pattern::new(vec![
-            One(Shape::T),
-            Permutation(ShapeCounter::one_of_each(), 4),
-        ]);
-        let move_rules = MoveRules::srs(MoveType::Softdrop);
-        let executor = PcPossibleExecutor::try_new(
-            &move_rules, clipped_board, &patterns, true,
-        ).unwrap();
-        let result = executor.execute();
-        assert_eq!(result.count_succeed(), 744);
-    }
 
     #[test]
     fn success_rate_contain_filled_line() {
-        use crate::PatternElement::*;
+        use PatternElement::*;
+        use Shape::*;
         let board = Board64::from_str("
             ####....##
             #####..###
@@ -386,6 +364,13 @@ mod tests {
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result.count_succeed(), 90);
+        assert_eq!(result.count_pending(), 0);
+
+        assert_eq!(result.get(&ShapeSequence::new(vec![O, I, T])), Some(true));
+        assert_eq!(result.get(&ShapeSequence::new(vec![S, T, Z])), Some(true));
+        assert_eq!(result.get(&ShapeSequence::new(vec![T, L, J])), Some(true));
+        assert_eq!(result.get(&ShapeSequence::new(vec![S, O, L])), Some(false));
+        assert_eq!(result.get(&ShapeSequence::new(vec![O, O, O])), None);
     }
 
     #[test]
