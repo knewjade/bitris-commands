@@ -65,7 +65,7 @@ fn validate_board(clipped: &ClippedBoard) -> bool {
 }
 
 
-/// A collection of errors that occur when making `PcPossibleExecutor`.
+/// A collection of errors that occur when making the executor.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum PcPossibleExecutorCreationError {
     #[error("Unexpected the count of board spaces.")]
@@ -76,7 +76,7 @@ pub enum PcPossibleExecutorCreationError {
 
 /// The executor to find PC possibles.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub struct PcPossibleExecutor<'a, T: RotationSystem> {
+pub struct PcPossibleBulkExecutor<'a, T: RotationSystem> {
     move_rules: &'a MoveRules<T>,
     clipped_board: ClippedBoard,
     pattern: &'a Pattern,
@@ -90,8 +90,8 @@ pub enum ExecuteInstruction {
     Stop,
 }
 
-impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
-    /// Make PcPossibleExecutor.
+impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
+    /// Make PcPossibleBulkExecutor.
     ///
     /// Returns `Err()` if the setting is incorrect.
     /// See `PcPosibleExecutorCreationError` for error patterns.
@@ -99,7 +99,7 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     /// use std::str::FromStr;
     /// use bitris::{Shape, Board64, MoveRules, MoveType};
     /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
-    /// use bitris_commands::pc_possible::PcPossibleExecutor;
+    /// use bitris_commands::pc_possible::PcPossibleBulkExecutor;
     ///
     /// let move_rules = MoveRules::srs(MoveType::Softdrop);
     ///
@@ -120,7 +120,7 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     ///
     /// let allows_hold = true;
     ///
-    /// let executor = PcPossibleExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
+    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
     ///     .expect("Failed to create an executor.");
     ///
     /// let results = executor.execute();
@@ -151,16 +151,12 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
         Ok(Self { move_rules, clipped_board, pattern, allows_hold })
     }
 
-    /// Start the search for PC possible.
-    /// Make PcPossibleExecutor.
-    ///
-    /// Returns `Err()` if the setting is incorrect.
-    /// See `PcPosibleExecutorCreationError` for error patterns.
+    /// Start the search for PC possible in bulk.
     /// ```
     /// use std::str::FromStr;
     /// use bitris::{Board64, MoveRules, MoveType};
     /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
-    /// use bitris_commands::pc_possible::PcPossibleExecutor;
+    /// use bitris_commands::pc_possible::PcPossibleBulkExecutor;
     ///
     /// let move_rules = MoveRules::srs(MoveType::Softdrop);
     ///
@@ -179,7 +175,7 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     ///
     /// let allows_hold = true;
     ///
-    /// let executor = PcPossibleExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
+    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
     ///     .expect("Failed to create an executor.");
     ///
     /// let results = executor.execute();
@@ -191,13 +187,13 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
         self.execute_with_early_stopping(move |_| Continue)
     }
 
-    /// Start the search for PC possible with early stopping.
+    /// Start the search for PC possible in bulk with early stopping.
     /// If the clojure returns `ExecuteInstruction::Stop`, it stops.
     /// ```
     /// use std::str::FromStr;
     /// use bitris::{Board64, MoveRules, MoveType};
     /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
-    /// use bitris_commands::pc_possible::{ExecuteInstruction, PcPossibleExecutor};
+    /// use bitris_commands::pc_possible::{ExecuteInstruction, PcPossibleBulkExecutor};
     ///
     /// let move_rules = MoveRules::srs(MoveType::Softdrop);
     ///
@@ -216,7 +212,7 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     ///
     /// let allows_hold = false;
     ///
-    /// let executor = PcPossibleExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
+    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
     ///     .expect("Failed to create an executor.");
     ///
     /// // Stops after 10 failures.
@@ -233,7 +229,7 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     /// assert!(result.count_accepted() < 2520); // under 2520 = 7*6*5*4*3 sequences
     /// assert!(0 < result.count_pending());
     /// ```
-    pub fn execute_with_early_stopping(&self, early_stopping: fn(&PcResults) -> ExecuteInstruction) -> PcResults {
+    pub fn execute_with_early_stopping(&self, early_stopping: impl Fn(&PcResults) -> ExecuteInstruction) -> PcResults {
         let sequences = self.pattern.to_sequences();
         let infer_size = self.pattern.dim_shapes();
 
@@ -379,7 +375,7 @@ mod tests {
     use bitris::{Board64, MoveRules, MoveType, Shape};
 
     use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
-    use crate::pc_possible::{PcPossibleExecutor, PcPossibleExecutorCreationError};
+    use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorCreationError};
 
     #[test]
     fn success_rate_contain_filled_line() {
@@ -396,7 +392,7 @@ mod tests {
             Permutation(ShapeCounter::one_of_each(), 3),
         ]);
         let move_rules = MoveRules::srs(MoveType::Softdrop);
-        let executor = PcPossibleExecutor::try_new(
+        let executor = PcPossibleBulkExecutor::try_new(
             &move_rules, clipped_board, &patterns, true,
         ).unwrap();
         let result = executor.execute();
@@ -424,7 +420,7 @@ mod tests {
         ]);
         let move_rules = MoveRules::srs(MoveType::Softdrop);
         assert_eq!(
-            PcPossibleExecutor::try_new(&move_rules, clipped_board, &patterns, true).unwrap_err(),
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &patterns, true).unwrap_err(),
             PcPossibleExecutorCreationError::UnexpectedBoardSpaces,
         );
     }
@@ -442,7 +438,7 @@ mod tests {
         ]);
         let move_rules = MoveRules::srs(MoveType::Softdrop);
         assert_eq!(
-            PcPossibleExecutor::try_new(&move_rules, clipped_board, &patterns, true).unwrap_err(),
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &patterns, true).unwrap_err(),
             PcPossibleExecutorCreationError::PatternAreNotEnough,
         );
     }

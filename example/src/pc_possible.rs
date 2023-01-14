@@ -7,13 +7,13 @@ mod tests {
     use bitris_commands::pc_possible::*;
     use bitris_commands::prelude::*;
 
-    // Normal use case with SRS.
+    // Finds PCs in bulk with SRS.
     #[test]
-    fn srs() {
+    fn bulk_with_srs() {
         // Makes a binder with SRS & Softdrop.
         // Because of the type system, changes require the re-making of the binder.
         let move_type = MoveType::Softdrop;
-        let mut binder = PcPossibleExecutorBinder::srs(move_type);
+        let mut binder = PcPossibleBulkExecutorBinder::srs(move_type);
 
         // Sets a board and goal for 4 lines PC.
         let board = Board64::from_str("
@@ -70,12 +70,12 @@ mod tests {
         );
     }
 
-    // Using early stopping.
+    // Use early stopping.
     #[test]
-    fn early_stopping() {
+    fn bulk_using_early_stopping() {
         // Makes a binder with SRS & Harddrop.
         let move_type = MoveType::Harddrop;
-        let mut binder = PcPossibleExecutorBinder::srs(move_type);
+        let mut binder = PcPossibleBulkExecutorBinder::srs(move_type);
 
         let board = Board64::from_str("
             ..........
@@ -110,14 +110,14 @@ mod tests {
         assert!(0 < result.count_pending()); // There are still sequences to be explored.
     }
 
-    // Using with customized kicks
+    // Use with customized kicks
     #[test]
     fn customized_kick() {
         // Makes a binder with customized kicks.
         let kick_table = MyKickTable;
         let move_type = MoveType::Softdrop;
         let move_rules = MoveRules::new(Rc::from(kick_table), move_type);
-        let mut binder = PcPossibleExecutorBinder::default(move_rules);
+        let mut binder = PcPossibleBulkExecutorBinder::default(move_rules);
 
         // After that, it's the same as normal.
         let board = Board64::from_str("

@@ -4,25 +4,25 @@ use bitris::prelude::*;
 use bitris::srs::SrsKickTable;
 
 use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, TryBind};
-use crate::pc_possible::{PcPossibleExecutor, PcPossibleExecutorCreationError};
+use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorCreationError};
 
-/// The binder to hold and tie settings for `PcPossibleExecutor`.
+/// The binder to hold and tie settings for `PcPossibleBulkExecutor`.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub struct PcPossibleExecutorBinder<T: RotationSystem> {
+pub struct PcPossibleBulkExecutorBinder<T: RotationSystem> {
     pub move_rules: MoveRules<T>,
     pub clipped_board: ClippedBoard,
     pub pattern: Rc<Pattern>,
     pub allows_hold: bool,
 }
 
-impl PcPossibleExecutorBinder<SrsKickTable> {
-    /// Making the executor with SRS. See `PcPossibleExecutorBinder::default()` for more details.
+impl PcPossibleBulkExecutorBinder<SrsKickTable> {
+    /// Making the executor with SRS. See `PcPossibleBulkExecutorBinder::default()` for more details.
     pub fn srs(move_type: MoveType) -> Self {
-        PcPossibleExecutorBinder::default(MoveRules::srs(move_type))
+        PcPossibleBulkExecutorBinder::default(MoveRules::srs(move_type))
     }
 }
 
-impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
+impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
     /// Making the executor with default.
     ///
     /// The default values are as follows:
@@ -43,11 +43,11 @@ impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
     }
 }
 
-impl<'a, T: RotationSystem> TryBind<'a, PcPossibleExecutor<'a, T>> for PcPossibleExecutorBinder<T> {
+impl<'a, T: RotationSystem> TryBind<'a, PcPossibleBulkExecutor<'a, T>> for PcPossibleBulkExecutorBinder<T> {
     type Error = PcPossibleExecutorCreationError;
 
-    fn try_bind(&'a self) -> Result<PcPossibleExecutor<'a, T>, Self::Error> {
-        PcPossibleExecutor::try_new(
+    fn try_bind(&'a self) -> Result<PcPossibleBulkExecutor<'a, T>, Self::Error> {
+        PcPossibleBulkExecutor::try_new(
             &self.move_rules,
             self.clipped_board,
             self.pattern.as_ref(),
@@ -65,13 +65,13 @@ mod tests {
     use bitris::prelude::*;
 
     use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, TryBind};
-    use crate::pc_possible::PcPossibleExecutorBinder;
+    use crate::pc_possible::PcPossibleBulkExecutorBinder;
 
     #[test]
     fn reuse() {
         use PatternElement::*;
 
-        let mut binder = PcPossibleExecutorBinder::srs(MoveType::Softdrop);
+        let mut binder = PcPossibleBulkExecutorBinder::srs(MoveType::Softdrop);
         let board = Board64::from_str("
             ####......
             ####......
