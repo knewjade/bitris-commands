@@ -8,6 +8,7 @@ pub use shape_order::*;
 pub use shape_counter::*;
 pub use traits::*;
 
+#[doc(hidden)]
 pub mod prelude {
     pub use bitris::prelude::*;
 
