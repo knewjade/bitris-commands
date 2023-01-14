@@ -1,10 +1,11 @@
 use bitris::prelude::*;
+use fxhash::FxHashSet;
 use thiserror::Error;
 
 use crate::{ClippedBoard, ForEachVisitor, OrderCursor, Pattern, PopOp, ShapeOrder, ShapeSequence};
 use crate::internals::{FuzzyShape, FuzzyShapeOrder};
 use crate::pc_possible::{Buffer, PcResults, VerticalParity};
-use crate::pc_possible::executor::ExecutionStatus::Continue;
+use crate::pc_possible::executor::ExecuteInstruction::Continue;
 
 struct Visitor<'a> {
     result: &'a mut PcResults,
@@ -24,6 +25,20 @@ impl<'a> ForEachVisitor<[Shape]> for Visitor<'a> {
         let order = ShapeSequence::new(shapes.to_vec());
         self.result.accept_if_present(&order, true);
     }
+}
+
+
+/// Dataset for detecting the same state during PC possible search.
+/// The block counts and height on the board can determine the search depth. (Placed pieces will change the block counts.)
+/// If the search depth is the same and the head of shapes is the same, they are the same states.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+struct SearchingState {
+    // The board does not include filled rows.
+    board: Board64,
+
+    height: u32,
+
+    first: Option<Shape>,
 }
 
 
@@ -68,11 +83,11 @@ pub struct PcPossibleExecutor<'a, T: RotationSystem> {
     allows_hold: bool,
 }
 
-// TODO
+/// A collection of statements that instruct execution to continue/stop.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
-pub enum ExecutionStatus {
+pub enum ExecuteInstruction {
     #[default] Continue,
-    Break,
+    Stop,
 }
 
 impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
@@ -177,12 +192,12 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     }
 
     /// Start the search for PC possible with early stopping.
-    /// If the clojure returns Break, it stops.
+    /// If the clojure returns `ExecuteInstruction::Stop`, it stops.
     /// ```
     /// use std::str::FromStr;
     /// use bitris::{Board64, MoveRules, MoveType};
     /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
-    /// use bitris_commands::pc_possible::{ExecutionStatus, PcPossibleExecutor};
+    /// use bitris_commands::pc_possible::{ExecuteInstruction, PcPossibleExecutor};
     ///
     /// let move_rules = MoveRules::srs(MoveType::Softdrop);
     ///
@@ -207,9 +222,9 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     /// // Stops after 10 failures.
     /// let result = executor.execute_with_early_stopping(|results| {
     ///     if results.count_failed() < 10 {
-    ///         ExecutionStatus::Continue
+    ///         ExecuteInstruction::Continue
     ///     } else {
-    ///         ExecutionStatus::Break
+    ///         ExecuteInstruction::Stop
     ///     }
     /// });
     /// assert_eq!(result.count_failed(), 10);
@@ -218,22 +233,26 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     /// assert!(result.count_accepted() < 2520); // under 2520 = 7*6*5*4*3 sequences
     /// assert!(0 < result.count_pending());
     /// ```
-    pub fn execute_with_early_stopping(&self, early_stopping: fn(&PcResults) -> ExecutionStatus) -> PcResults {
+    pub fn execute_with_early_stopping(&self, early_stopping: fn(&PcResults) -> ExecuteInstruction) -> PcResults {
         let sequences = self.pattern.to_sequences();
         let infer_size = self.pattern.dim_shapes();
 
         let mut results = PcResults::new(&sequences);
 
+        let mut visited_states = FxHashSet::<SearchingState>::default();
+
         for sequence in sequences {
             if let Some(_) = results.get(&sequence) {
-                if early_stopping(&results) == ExecutionStatus::Break {
+                if early_stopping(&results) == ExecuteInstruction::Stop {
                     break;
                 }
                 continue;
             }
 
+            visited_states.clear();
+
             let order = sequence.to_order();
-            if let Some(order) = self.search_pc_order(self.clipped_board, order) {
+            if let Some(order) = self.search_pc_order(self.clipped_board, order, &mut visited_states) {
                 results.accept_if_present(&sequence, true);
 
                 if self.allows_hold {
@@ -244,7 +263,7 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
                 results.accept_if_present(&sequence, false);
             }
 
-            if early_stopping(&results) == ExecutionStatus::Break {
+            if early_stopping(&results) == ExecuteInstruction::Stop {
                 break;
             }
         }
@@ -256,20 +275,26 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
         &self,
         current_clipped_board: ClippedBoard,
         order: ShapeOrder,
+        visited_states: &mut FxHashSet::<SearchingState>,
     ) -> Option<ShapeSequence> {
         let cursor = order.new_cursor();
         let mut buffer = Buffer::with_resized(cursor.len_unused());
         let parity = VerticalParity::new(current_clipped_board);
 
-        self.pop_shape(cursor, current_clipped_board, &mut buffer, &parity)
+        self.pop_shape(cursor, current_clipped_board, visited_states, &mut buffer, &parity)
     }
 
     fn pop_shape(
-        &self, cursor: OrderCursor, clipped_board: ClippedBoard, buffer: &mut Buffer, parity: &VerticalParity,
+        &self,
+        cursor: OrderCursor,
+        clipped_board: ClippedBoard,
+        visited_states: &mut FxHashSet::<SearchingState>,
+        buffer: &mut Buffer,
+        parity: &VerticalParity,
     ) -> Option<ShapeSequence> {
         let (popped, next_cursor) = cursor.pop(PopOp::First);
         if let Some(shape) = popped {
-            if let Some(order) = self.increment(shape, clipped_board, next_cursor, buffer, parity) {
+            if let Some(order) = self.increment(shape, clipped_board, next_cursor, visited_states, buffer, parity) {
                 return Some(order);
             }
         } else {
@@ -279,7 +304,7 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
         if self.allows_hold {
             let (popped, next_cursor) = cursor.pop(PopOp::Second);
             if let Some(shape) = popped {
-                if let Some(order) = self.increment(shape, clipped_board, next_cursor, buffer, parity) {
+                if let Some(order) = self.increment(shape, clipped_board, next_cursor, visited_states, buffer, parity) {
                     return Some(order);
                 }
             }
@@ -289,7 +314,13 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
     }
 
     fn increment(
-        &self, shape: Shape, clipped_board: ClippedBoard, next_cursor: OrderCursor, buffer: &mut Buffer, parity: &VerticalParity,
+        &self,
+        shape: Shape,
+        clipped_board: ClippedBoard,
+        next_cursor: OrderCursor,
+        visited_states: &mut FxHashSet::<SearchingState>,
+        buffer: &mut Buffer,
+        parity: &VerticalParity,
     ) -> Option<ShapeSequence> {
         buffer.increment(shape);
 
@@ -308,10 +339,16 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
                 return Some(ShapeSequence::new(buffer.as_slice().to_vec()));
             }
 
-            let next_clipped_board = ClippedBoard::new_unsafe(
-                board, clipped_board.height() - lines_cleared.count(),
-            );
+            let height = clipped_board.height() - lines_cleared.count();
+            if !visited_states.insert(SearchingState {
+                board,
+                height,
+                first: next_cursor.first(),
+            }) {
+                continue;
+            }
 
+            let next_clipped_board = ClippedBoard::new_unsafe(board, height);
             if !validate_board(&next_clipped_board) {
                 continue;
             }
@@ -323,7 +360,7 @@ impl<'a, T: RotationSystem> PcPossibleExecutor<'a, T> {
                 continue;
             }
 
-            if let Some(order) = self.pop_shape(next_cursor, next_clipped_board, buffer, &next_parity) {
+            if let Some(order) = self.pop_shape(next_cursor, next_clipped_board, visited_states, buffer, &next_parity) {
                 return Some(order);
             }
         }
@@ -341,7 +378,7 @@ mod tests {
 
     use bitris::{Board64, MoveRules, MoveType, Shape};
 
-    use crate::{PatternElement, ClippedBoard, Pattern, ShapeCounter, ShapeSequence};
+    use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
     use crate::pc_possible::{PcPossibleExecutor, PcPossibleExecutorCreationError};
 
     #[test]

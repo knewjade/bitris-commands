@@ -53,7 +53,8 @@ impl<'a> OrderCursor<'a> {
     /// If nothing that can be popped next, None is returned for the shape.
     /// The next cursor is always returned as available.
     ///
-    /// This function ensures the following behaviors.
+    /// The shape returned by the first is that received before the second.
+    /// Therefore, this function ensures the following behaviors.
     ///
     /// * If the first returns None, the second is always None.
     ///   The last shape is always assigned to the first.
@@ -99,6 +100,31 @@ impl<'a> OrderCursor<'a> {
                 (None, *self)
             }
         };
+    }
+
+    /// Returns the first shape.
+    #[inline]
+    pub fn peek(&self, op: PopOp) -> Option<Shape> {
+        match op {
+            PopOp::First => self.first(),
+            PopOp::Second => self.second(),
+        }
+    }
+
+    /// Returns the first shape.
+    #[inline]
+    pub fn first(&self) -> Option<Shape> {
+        self.head.map(|index| self.sequence.shapes[index])
+    }
+
+    /// Returns the second shape.
+    #[inline]
+    pub fn second(&self) -> Option<Shape> {
+        if self.tails < self.sequence.shapes.len() {
+            Some(self.sequence.shapes[self.tails])
+        } else {
+            None
+        }
     }
 }
 
@@ -152,6 +178,8 @@ mod tests {
         assert!(cursor.has_next());
         assert_eq!(cursor.len_unused(), 1);
         assert_eq!(cursor.unused_shapes().shapes(), vec![T]);
+        assert_eq!(cursor.first(), Some(T));
+        assert_eq!(cursor.second(), None);
         let (shape, cursor) = cursor.pop(PopOp::Second);
         assert_eq!(shape, None);
 
@@ -159,12 +187,16 @@ mod tests {
         assert!(cursor.has_next());
         assert_eq!(cursor.len_unused(), 1);
         assert_eq!(cursor.unused_shapes().shapes(), vec![T]);
+        assert_eq!(cursor.first(), Some(T));
+        assert_eq!(cursor.second(), None);
         let (shape, cursor) = cursor.pop(PopOp::First);
         assert_eq!(shape, Some(T));
 
         assert!(!cursor.has_next());
         assert_eq!(cursor.len_unused(), 0);
         assert_eq!(cursor.unused_shapes().shapes(), vec![]);
+        assert_eq!(cursor.first(), None);
+        assert_eq!(cursor.second(), None);
     }
 
     #[test]
@@ -178,6 +210,8 @@ mod tests {
         assert!(cursor.has_next());
         assert_eq!(cursor.len_unused(), 2);
         assert_eq!(cursor.unused_shapes().shapes(), vec![O, S]);
+        assert_eq!(cursor.peek(PopOp::First), Some(O));
+        assert_eq!(cursor.peek(PopOp::Second), Some(S));
         let (shape, cursor) = cursor.pop(PopOp::First);
         assert_eq!(shape, Some(O));
 
@@ -185,6 +219,8 @@ mod tests {
         assert!(cursor.has_next());
         assert_eq!(cursor.len_unused(), 1);
         assert_eq!(cursor.unused_shapes().shapes(), vec![S]);
+        assert_eq!(cursor.peek(PopOp::First), Some(S));
+        assert_eq!(cursor.peek(PopOp::Second), None);
         let (shape, cursor) = cursor.pop(PopOp::First);
         assert_eq!(shape, Some(S));
 
@@ -192,12 +228,16 @@ mod tests {
         assert!(!cursor.has_next());
         assert_eq!(cursor.len_unused(), 0);
         assert_eq!(cursor.unused_shapes().shapes(), vec![]);
+        assert_eq!(cursor.peek(PopOp::First), None);
+        assert_eq!(cursor.peek(PopOp::Second), None);
         let (shape, cursor) = cursor.pop(PopOp::First);
         assert_eq!(shape, None);
 
         assert!(!cursor.has_next());
         assert_eq!(cursor.len_unused(), 0);
         assert_eq!(cursor.unused_shapes().shapes(), vec![]);
+        assert_eq!(cursor.peek(PopOp::First), None);
+        assert_eq!(cursor.peek(PopOp::Second), None);
     }
 
     #[test]
@@ -211,6 +251,8 @@ mod tests {
         assert!(cursor.has_next());
         assert_eq!(cursor.len_unused(), 3);
         assert_eq!(cursor.unused_shapes().shapes(), vec![O, S, T]);
+        assert_eq!(cursor.peek(PopOp::First), Some(O));
+        assert_eq!(cursor.peek(PopOp::Second), Some(S));
         let (shape, cursor) = cursor.pop(PopOp::Second);
         assert_eq!(shape, Some(S));
 
@@ -218,6 +260,8 @@ mod tests {
         assert!(cursor.has_next());
         assert_eq!(cursor.len_unused(), 2);
         assert_eq!(cursor.unused_shapes().shapes(), vec![O, T]);
+        assert_eq!(cursor.peek(PopOp::First), Some(O));
+        assert_eq!(cursor.peek(PopOp::Second), Some(T));
         let (shape, cursor) = cursor.pop(PopOp::Second);
         assert_eq!(shape, Some(T));
 
@@ -225,6 +269,8 @@ mod tests {
         assert!(cursor.has_next());
         assert_eq!(cursor.len_unused(), 1);
         assert_eq!(cursor.unused_shapes().shapes(), vec![O]);
+        assert_eq!(cursor.peek(PopOp::First), Some(O));
+        assert_eq!(cursor.peek(PopOp::Second), None);
         let (shape, cursor) = cursor.pop(PopOp::Second);
         assert_eq!(shape, None);
 
@@ -232,6 +278,8 @@ mod tests {
         assert!(cursor.has_next());
         assert_eq!(cursor.len_unused(), 1);
         assert_eq!(cursor.unused_shapes().shapes(), vec![O]);
+        assert_eq!(cursor.peek(PopOp::First), Some(O));
+        assert_eq!(cursor.peek(PopOp::Second), None);
         let (shape, cursor) = cursor.pop(PopOp::First);
         assert_eq!(shape, Some(O));
 
@@ -239,11 +287,15 @@ mod tests {
         assert!(!cursor.has_next());
         assert_eq!(cursor.len_unused(), 0);
         assert_eq!(cursor.unused_shapes().shapes(), vec![]);
+        assert_eq!(cursor.peek(PopOp::First), None);
+        assert_eq!(cursor.peek(PopOp::Second), None);
         let (index, cursor) = cursor.pop(PopOp::Second);
         assert_eq!(index, None);
 
         assert!(!cursor.has_next());
         assert_eq!(cursor.len_unused(), 0);
         assert_eq!(cursor.unused_shapes().shapes(), vec![]);
+        assert_eq!(cursor.peek(PopOp::First), None);
+        assert_eq!(cursor.peek(PopOp::Second), None);
     }
 }

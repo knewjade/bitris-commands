@@ -98,9 +98,9 @@ mod tests {
         // Stops after 10 failures.
         let result = executor.execute_with_early_stopping(|results| {
             if results.count_failed() < 10 {
-                ExecutionStatus::Continue
+                ExecuteInstruction::Continue
             } else {
-                ExecutionStatus::Break
+                ExecuteInstruction::Stop
             }
         });
         assert_eq!(result.count_failed(), 10);
