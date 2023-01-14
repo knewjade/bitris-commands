@@ -273,6 +273,17 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         results
     }
 
+    /// This function is dedicated to a single sequence because .
+    /// The interface is not directly exposed since it's a shortcut to improve speed.
+    pub(crate) fn execute_single(&self) -> bool {
+        let sequences = self.pattern.to_sequences();
+        assert_eq!(sequences.len(), 1, "This function is dedicated to a single sequence.");
+        let order = sequences.first().unwrap().to_shape_order();
+
+        let mut visited_states = FxHashSet::<SearchingState>::default();
+        self.search_pc_order(self.clipped_board, order, &mut visited_states).is_some()
+    }
+
     fn search_pc_order(
         &self,
         current_clipped_board: ClippedBoard,
@@ -380,13 +391,14 @@ mod tests {
 
     use bitris::{Board64, MoveRules, MoveType, Shape};
 
-    use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
+    use crate::{BitShapes, ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
     use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
 
     #[test]
     fn success_rate_contain_filled_line() {
         use PatternElement::*;
         use Shape::*;
+
         let board = Board64::from_str("
             ####....##
             #####..###
@@ -398,6 +410,7 @@ mod tests {
             Permutation(ShapeCounter::one_of_each(), 3),
         ]);
         let move_rules = MoveRules::srs(MoveType::Softdrop);
+
         let executor = PcPossibleBulkExecutor::try_new(
             &move_rules, clipped_board, &pattern, true,
         ).unwrap();
@@ -410,6 +423,39 @@ mod tests {
         assert_eq!(result.get(&ShapeSequence::new(vec![T, L, J])), Some(true));
         assert_eq!(result.get(&ShapeSequence::new(vec![S, O, L])), Some(false));
         assert_eq!(result.get(&ShapeSequence::new(vec![O, O, O])), None);
+    }
+
+    #[test]
+    fn execute_single() {
+        use PatternElement::*;
+        use Shape::*;
+
+        let board = Board64::from_str("
+            ####....##
+            #####..###
+            #####..###
+        ").unwrap();
+        let clipped_board = ClippedBoard::try_new(board, 3).unwrap();
+        let move_rules = MoveRules::srs(MoveType::Softdrop);
+
+        {
+            let single_pattern = Pattern::new(vec![
+                Fixed(BitShapes::try_from(vec![J, O, I]).unwrap()),
+            ]);
+            let executor = PcPossibleBulkExecutor::try_new(
+                &move_rules, clipped_board, &single_pattern, true,
+            ).unwrap();
+            assert!(executor.execute_single());
+        }
+        {
+            let single_pattern = Pattern::new(vec![
+                Fixed(BitShapes::try_from(vec![J, T, I]).unwrap()),
+            ]);
+            let executor = PcPossibleBulkExecutor::try_new(
+                &move_rules, clipped_board, &single_pattern, true,
+            ).unwrap();
+            assert!(!executor.execute_single());
+        }
     }
 
     #[test]
