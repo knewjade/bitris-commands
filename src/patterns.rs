@@ -90,17 +90,17 @@ impl PatternElement {
 /// use bitris_commands::prelude::*;
 /// use PatternElement::*;
 ///
-/// let patterns = Pattern::new(vec![One(Shape::T), Wildcard, Wildcard]);
-/// assert_eq!(patterns.len_shapes_vec(), 49);
-/// assert_eq!(patterns.dim_shapes(), 3);
+/// let pattern = Pattern::new(vec![One(Shape::T), Wildcard, Wildcard]);
+/// assert_eq!(pattern.len_shapes_vec(), 49);
+/// assert_eq!(pattern.dim_shapes(), 3);
 ///
-/// let patterns = Pattern::new(vec![Fixed(BitShapes::try_from(vec![Shape::T, Shape::I]).unwrap())]);
-/// assert_eq!(patterns.len_shapes_vec(), 1);
-/// assert_eq!(patterns.dim_shapes(), 2);
+/// let pattern = Pattern::new(vec![Fixed(BitShapes::try_from(vec![Shape::T, Shape::I]).unwrap())]);
+/// assert_eq!(pattern.len_shapes_vec(), 1);
+/// assert_eq!(pattern.dim_shapes(), 2);
 ///
-/// let patterns = Pattern::new(vec![Permutation(ShapeCounter::one_of_each(), 3)]);
-/// assert_eq!(patterns.len_shapes_vec(), 210);
-/// assert_eq!(patterns.dim_shapes(), 3);
+/// let pattern = Pattern::new(vec![Permutation(ShapeCounter::one_of_each(), 3)]);
+/// assert_eq!(pattern.len_shapes_vec(), 210);
+/// assert_eq!(pattern.dim_shapes(), 3);
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Constructor)]
 pub struct Pattern {
@@ -193,9 +193,7 @@ impl Pattern {
 
     /// The number of elements in one shapes.
     pub fn dim_shapes(&self) -> usize {
-        if self.elements.is_empty() {
-            return 0;
-        }
+        assert!(!self.elements.is_empty(), "The pattern do not have shapes.");
         self.elements.iter()
             .map(|it| it.dim_shapes())
             .fold(0, |sum, it| sum + it)
@@ -261,10 +259,16 @@ mod tests {
 
     #[test]
     fn empty() {
-        let patterns = Pattern::new(vec![]);
-        assert_eq!(patterns.len_shapes_vec(), 0);
-        assert_eq!(patterns.dim_shapes(), 0);
-        assert_eq!(patterns.to_sequences().len(), 0);
+        let pattern = Pattern::new(vec![]);
+        assert_eq!(pattern.len_shapes_vec(), 0);
+        assert_eq!(pattern.to_sequences().len(), 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn empty_dim() {
+        let pattern = Pattern::new(vec![]);
+        pattern.dim_shapes();
     }
 
     #[test]

@@ -58,7 +58,7 @@ impl BitShapes {
     }
 }
 
-// A collection of errors that occur when making `BitShapes`.
+/// A collection of errors that occur when making `BitShapes`.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum BitShapesCreationError {
     TooManyShapes(usize),

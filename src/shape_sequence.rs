@@ -24,7 +24,7 @@ impl ShapeSequence {
     }
 
     #[inline]
-    pub fn to_order(&self) -> ShapeOrder {
+    pub fn to_shape_order(&self) -> ShapeOrder {
         ShapeOrder::new(self.shapes.clone())
     }
 }

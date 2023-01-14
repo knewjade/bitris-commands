@@ -4,7 +4,7 @@ use bitris::prelude::*;
 use bitris::srs::SrsKickTable;
 
 use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, TryBind};
-use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorCreationError};
+use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
 
 /// The binder to hold and tie settings for `PcPossibleBulkExecutor`.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
@@ -44,7 +44,7 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
 }
 
 impl<'a, T: RotationSystem> TryBind<'a, PcPossibleBulkExecutor<'a, T>> for PcPossibleBulkExecutorBinder<T> {
-    type Error = PcPossibleExecutorCreationError;
+    type Error = PcPossibleExecutorBulkCreationError;
 
     fn try_bind(&'a self) -> Result<PcPossibleBulkExecutor<'a, T>, Self::Error> {
         PcPossibleBulkExecutor::try_new(

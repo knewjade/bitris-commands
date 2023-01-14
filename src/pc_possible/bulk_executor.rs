@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::{ClippedBoard, ForEachVisitor, OrderCursor, Pattern, PopOp, ShapeOrder, ShapeSequence};
 use crate::internals::{FuzzyShape, FuzzyShapeOrder};
 use crate::pc_possible::{Buffer, PcResults, VerticalParity};
-use crate::pc_possible::executor::ExecuteInstruction::Continue;
+use crate::pc_possible::bulk_executor::ExecuteInstruction::Continue;
 
 struct Visitor<'a> {
     result: &'a mut PcResults,
@@ -67,11 +67,13 @@ fn validate_board(clipped: &ClippedBoard) -> bool {
 
 /// A collection of errors that occur when making the executor.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum PcPossibleExecutorCreationError {
+pub enum PcPossibleExecutorBulkCreationError {
     #[error("Unexpected the count of board spaces.")]
     UnexpectedBoardSpaces,
-    #[error("The pattern does not have enough blocks for PC.")]
-    PatternAreNotEnough,
+    #[error("The pattern is too short to take a PC.")]
+    ShortPatternDimension,
+    #[error("The pattern does not have shape sequences.")]
+    PatternIsEmpty,
 }
 
 /// The executor to find PC possibles.
@@ -133,15 +135,19 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         clipped_board: ClippedBoard,
         pattern: &'a Pattern,
         allows_hold: bool,
-    ) -> Result<Self, PcPossibleExecutorCreationError> {
-        use crate::pc_possible::PcPossibleExecutorCreationError::*;
+    ) -> Result<Self, PcPossibleExecutorBulkCreationError> {
+        use crate::pc_possible::PcPossibleExecutorBulkCreationError::*;
 
         if clipped_board.spaces() % 4 != 0 {
             return Err(UnexpectedBoardSpaces);
         }
 
+        if pattern.len_shapes_vec() == 0 {
+            return Err(PatternIsEmpty);
+        }
+
         if (pattern.dim_shapes() as u32) < clipped_board.spaces() / 4 {
-            return Err(PatternAreNotEnough);
+            return Err(ShortPatternDimension);
         }
 
         debug_assert!(0 < clipped_board.spaces());
@@ -247,13 +253,13 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 
             visited_states.clear();
 
-            let order = sequence.to_order();
-            if let Some(order) = self.search_pc_order(self.clipped_board, order, &mut visited_states) {
+            let order = sequence.to_shape_order();
+            if let Some(sequence_pc) = self.search_pc_order(self.clipped_board, order, &mut visited_states) {
                 results.accept_if_present(&sequence, true);
 
                 if self.allows_hold {
                     let mut visitor = Visitor { result: &mut results };
-                    order.infer_input_walk(infer_size, &mut visitor);
+                    sequence_pc.infer_input_walk(infer_size, &mut visitor);
                 }
             } else {
                 results.accept_if_present(&sequence, false);
@@ -375,7 +381,7 @@ mod tests {
     use bitris::{Board64, MoveRules, MoveType, Shape};
 
     use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
-    use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorCreationError};
+    use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
 
     #[test]
     fn success_rate_contain_filled_line() {
@@ -388,12 +394,12 @@ mod tests {
             #####..###
         ").unwrap();
         let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-        let patterns = Pattern::new(vec![
+        let pattern = Pattern::new(vec![
             Permutation(ShapeCounter::one_of_each(), 3),
         ]);
         let move_rules = MoveRules::srs(MoveType::Softdrop);
         let executor = PcPossibleBulkExecutor::try_new(
-            &move_rules, clipped_board, &patterns, true,
+            &move_rules, clipped_board, &pattern, true,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result.count_succeed(), 90);
@@ -414,32 +420,47 @@ mod tests {
             ######..##
         ").unwrap();
         let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
-        let patterns = Pattern::new(vec![
+        let pattern = Pattern::new(vec![
             One(Shape::O),
             One(Shape::O),
         ]);
         let move_rules = MoveRules::srs(MoveType::Softdrop);
         assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &patterns, true).unwrap_err(),
-            PcPossibleExecutorCreationError::UnexpectedBoardSpaces,
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleExecutorBulkCreationError::UnexpectedBoardSpaces,
         );
     }
 
     #[test]
-    fn error_pattern_are_not_enough() {
+    fn error_short_pattern() {
         use crate::PatternElement::*;
         let board = Board64::from_str("
             ######....
             ######....
         ").unwrap();
         let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
-        let patterns = Pattern::new(vec![
+        let pattern = Pattern::new(vec![
             One(Shape::O),
         ]);
         let move_rules = MoveRules::srs(MoveType::Softdrop);
         assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &patterns, true).unwrap_err(),
-            PcPossibleExecutorCreationError::PatternAreNotEnough,
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleExecutorBulkCreationError::ShortPatternDimension,
+        );
+    }
+
+    #[test]
+    fn error_pattern_is_empty() {
+        let board = Board64::from_str("
+            ######....
+            ######....
+        ").unwrap();
+        let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
+        let pattern = Pattern::default();
+        let move_rules = MoveRules::srs(MoveType::Softdrop);
+        assert_eq!(
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleExecutorBulkCreationError::PatternIsEmpty,
         );
     }
 }
