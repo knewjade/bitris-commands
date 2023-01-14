@@ -58,18 +58,18 @@ impl BitShapes {
     }
 }
 
-// A collection of errors that occur when converting to the shape.
+// A collection of errors that occur when making `BitShapes`.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum BitShapesTryFromError {
+pub enum BitShapesCreationError {
     TooManyShapes(usize),
 }
 
 impl TryFrom<&[Shape]> for BitShapes {
-    type Error = BitShapesTryFromError;
+    type Error = BitShapesCreationError;
 
     fn try_from(shapes: &[Shape]) -> Result<Self, Self::Error> {
         if 23 <= shapes.len() {
-            return Err(BitShapesTryFromError::TooManyShapes(shapes.len()));
+            return Err(BitShapesCreationError::TooManyShapes(shapes.len()));
         }
 
         let mut value = 0u64;
@@ -83,7 +83,7 @@ impl TryFrom<&[Shape]> for BitShapes {
 }
 
 impl TryFrom<&Vec<Shape>> for BitShapes {
-    type Error = BitShapesTryFromError;
+    type Error = BitShapesCreationError;
 
     /// ```
     /// use bitris_commands::prelude::*;
@@ -93,24 +93,24 @@ impl TryFrom<&Vec<Shape>> for BitShapes {
     /// assert_eq!(shapes.to_vec(), vec![Shape::I, Shape::O, Shape::T]);
     ///
     /// let result = BitShapes::try_from(vec![Shape::T].repeat(23));
-    /// assert_eq!(result, Err(BitShapesTryFromError::TooManyShapes(23)));
+    /// assert_eq!(result, Err(BitShapesCreationError::TooManyShapes(23)));
     /// ```
     fn try_from(shapes: &Vec<Shape>) -> Result<Self, Self::Error> {
         BitShapes::try_from(shapes.as_slice())
     }
 }
 
-forward_impl_try_from!(BitShapes, BitShapesTryFromError, from Vec<Shape>);
+forward_impl_try_from!(BitShapes, BitShapesCreationError, from Vec<Shape>);
 
 impl TryFrom<&ShapeSequence> for BitShapes {
-    type Error = BitShapesTryFromError;
+    type Error = BitShapesCreationError;
 
     fn try_from(order: &ShapeSequence) -> Result<Self, Self::Error> {
         BitShapes::try_from(order.shapes())
     }
 }
 
-forward_impl_try_from!(BitShapes, BitShapesTryFromError, from ShapeSequence);
+forward_impl_try_from!(BitShapes, BitShapesCreationError, from ShapeSequence);
 
 
 #[cfg(test)]

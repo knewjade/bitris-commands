@@ -20,7 +20,7 @@ impl ShapeCounter {
     /// ```
     /// use bitris_commands::prelude::*;
     /// let counter = ShapeCounter::empty();
-    /// assert_eq!(counter.total_size(), 0);
+    /// assert_eq!(counter.len(), 0);
     /// ```
     #[inline]
     pub fn empty() -> Self {
@@ -31,7 +31,7 @@ impl ShapeCounter {
     /// use bitris_commands::prelude::*;
     /// use Shape::*;
     /// let counter = ShapeCounter::one_of_each();
-    /// assert_eq!(counter.total_size(), 7);
+    /// assert_eq!(counter.len(), 7);
     /// assert_eq!(counter, ShapeCounter::from(vec![T, I, O, L, J, S, Z]));
     /// ```
     #[inline]
@@ -40,7 +40,7 @@ impl ShapeCounter {
     }
 
     #[inline]
-    pub fn total_size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.counters.into_iter()
             .map(|it| it as usize)
             .fold(0, |sum, it| sum + it)
@@ -50,7 +50,7 @@ impl ShapeCounter {
     /// ```
     /// use bitris_commands::prelude::*;
     /// let counter = ShapeCounter::from(vec![Shape::O, Shape::O, Shape::S]);
-    /// assert_eq!(counter.total_size(), 3);
+    /// assert_eq!(counter.len(), 3);
     /// assert_eq!(counter.to_pairs(), vec![(Shape::O, 2), (Shape::S, 1)]);
     /// ```
     pub fn to_pairs(&self) -> Vec<(Shape, u8)> {
@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn one_of_each() {
         let counter = ShapeCounter::one_of_each();
-        assert_eq!(counter.total_size(), 7);
+        assert_eq!(counter.len(), 7);
         assert!(Shape::all_into_iter().any(|shape| counter[shape] == 1));
         assert!(counter.to_pairs().into_iter().all(|(_, count)| count == 1));
     }
