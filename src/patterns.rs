@@ -128,7 +128,7 @@ impl TryFrom<Vec<PatternElement>> for Pattern {
 }
 
 impl Pattern {
-    fn try_new(elements: Vec<PatternElement>) -> Result<Self, PatternCreationError> {
+    pub fn try_new(elements: Vec<PatternElement>) -> Result<Self, PatternCreationError> {
         use PatternElement::*;
         use PatternCreationError::*;
 
