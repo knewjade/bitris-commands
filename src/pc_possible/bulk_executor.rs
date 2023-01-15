@@ -96,7 +96,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// Make PcPossibleBulkExecutor.
     ///
     /// Returns `Err()` if the setting is incorrect.
-    /// See `PcPosibleExecutorCreationError` for error patterns.
+    /// See `PcPossibleBulkExecutorCreationError` for error patterns.
     /// ```
     /// use std::str::FromStr;
     /// use bitris::{Shape, Board64, MoveRules, MoveType};
@@ -136,7 +136,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         pattern: &'a Pattern,
         allows_hold: bool,
     ) -> Result<Self, PcPossibleExecutorBulkCreationError> {
-        use crate::pc_possible::PcPossibleExecutorBulkCreationError::*;
+        use PcPossibleExecutorBulkCreationError::*;
 
         if clipped_board.spaces() % 4 != 0 {
             return Err(UnexpectedBoardSpaces);
@@ -146,49 +146,19 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
             return Err(PatternIsEmpty);
         }
 
-        if (pattern.dim_shapes() as u32) < clipped_board.spaces() / 4 {
+        let dimension = pattern.dim_shapes() as u32;
+        if dimension < clipped_board.spaces() / 4 {
             return Err(ShortPatternDimension);
         }
 
         debug_assert!(0 < clipped_board.spaces());
 
-        let allows_hold = allows_hold && (clipped_board.spaces() / 4 < pattern.dim_shapes() as u32);
+        let allows_hold = allows_hold && (clipped_board.spaces() / 4 < dimension);
 
         Ok(Self { move_rules, clipped_board, pattern, allows_hold })
     }
 
     /// Start the search for PC possible in bulk.
-    /// ```
-    /// use std::str::FromStr;
-    /// use bitris::{Board64, MoveRules, MoveType};
-    /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
-    /// use bitris_commands::pc_possible::PcPossibleBulkExecutor;
-    ///
-    /// let move_rules = MoveRules::srs(MoveType::Softdrop);
-    ///
-    /// let board = Board64::from_str("
-    ///     XXXX....XX
-    ///     XXXX...XXX
-    ///     XXXX..XXXX
-    ///     XXXX...XXX
-    /// ").expect("Failed to create a board.");
-    /// let height = 4;
-    /// let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
-    ///
-    /// let pattern = Pattern::new(vec![
-    ///     PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
-    /// ]);
-    ///
-    /// let allows_hold = true;
-    ///
-    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
-    ///     .expect("Failed to create an executor.");
-    ///
-    /// let results = executor.execute();
-    /// assert_eq!(results.count_succeed(), 514);
-    /// assert_eq!(results.count_failed(), 326);
-    /// assert_eq!(results.count_accepted(), 840);
-    /// ```
     pub fn execute(&self) -> PcResults {
         self.execute_with_early_stopping(move |_| Continue)
     }

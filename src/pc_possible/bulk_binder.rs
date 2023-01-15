@@ -3,8 +3,8 @@ use std::rc::Rc;
 use bitris::prelude::*;
 use bitris::srs::SrsKickTable;
 
-use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, TryBind};
-use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
+use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
+use crate::pc_possible::{ExecuteInstruction, PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError, PcResults};
 
 /// The binder to hold and tie settings for `PcPossibleBulkExecutor`.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
@@ -26,10 +26,10 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
     /// Making the executor with default.
     ///
     /// The default values are as follows:
-    ///   + move rules: from argument
-    ///   + board: Blank
+    ///   + [required] move rules: from argument
+    ///   + board: blank
     ///   + height: 4 lines
-    ///   + pattern: Factorial of all shapes (like `*p7`)
+    ///   + pattern: factorial of all shapes (like `*p7`)
     ///   + allows hold: yes
     pub fn default(move_rules: MoveRules<T>) -> Self {
         Self {
@@ -41,12 +41,20 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
             allows_hold: true,
         }
     }
-}
 
-impl<'a, T: RotationSystem> TryBind<'a, PcPossibleBulkExecutor<'a, T>> for PcPossibleBulkExecutorBinder<T> {
-    type Error = PcPossibleExecutorBulkCreationError;
+    // See `PcPossibleBulkExecutor::{try_new, execute}` for more details.
+    pub fn try_execute(&self) -> Result<PcResults, PcPossibleExecutorBulkCreationError> {
+        let executor = self.try_bind()?;
+        Ok(executor.execute())
+    }
 
-    fn try_bind(&'a self) -> Result<PcPossibleBulkExecutor<'a, T>, Self::Error> {
+    // See `PcPossibleBulkExecutor::{try_new, execute_with_early_stopping}` for more details.
+    pub fn try_execute_with_early_stopping(&self, early_stopping: impl Fn(&PcResults) -> ExecuteInstruction) -> Result<PcResults, PcPossibleExecutorBulkCreationError> {
+        let executor = self.try_bind()?;
+        Ok(executor.execute_with_early_stopping(early_stopping))
+    }
+
+    fn try_bind(&self) -> Result<PcPossibleBulkExecutor<T>, PcPossibleExecutorBulkCreationError> {
         PcPossibleBulkExecutor::try_new(
             &self.move_rules,
             self.clipped_board,
@@ -64,7 +72,7 @@ mod tests {
 
     use bitris::prelude::*;
 
-    use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter, TryBind};
+    use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
     use crate::pc_possible::PcPossibleBulkExecutorBinder;
 
     #[test]
@@ -80,8 +88,7 @@ mod tests {
         ").unwrap();
         binder.clipped_board = ClippedBoard::try_new(board, 4).unwrap();
 
-        let executor = binder.try_bind().unwrap();
-        let result = executor.execute();
+        let result = binder.try_execute().unwrap();
         assert_eq!(result.count_succeed(), 5040);
 
         let mut binder = binder.clone();
@@ -95,8 +102,7 @@ mod tests {
         binder.pattern = Rc::from(Pattern::new(vec![
             Permutation(ShapeCounter::one_of_each(), 6),
         ]));
-        let executor = binder.try_bind().unwrap();
-        let result = executor.execute();
+        let result = binder.try_execute().unwrap();
         assert_eq!(result.count_succeed(), 4088);
     }
 }

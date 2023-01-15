@@ -168,7 +168,7 @@ mod tests {
 
             let binder = (benchmark.generator)();
 
-            let results = binder.try_bind().unwrap().execute();
+            let results = binder.try_execute().unwrap();
 
             assert_eq!(results.count_succeed(), benchmark.succeed);
             assert_eq!(results.count_accepted(), benchmark.accepted);
