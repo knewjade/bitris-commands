@@ -181,10 +181,10 @@ impl PcResults {
     /// assert_eq!(result.count_succeed(), 2);
     /// ```
     #[inline]
-    pub fn count_succeed(&self) -> usize {
+    pub fn count_succeed(&self) -> u64 {
         self.succeed.values()
             .filter(|value| value.unwrap_or(false))
-            .count()
+            .count() as u64
     }
 
     /// Returns the count of shape sequences found to be failed.
@@ -205,10 +205,10 @@ impl PcResults {
     /// assert_eq!(result.count_failed(), 2);
     /// ```
     #[inline]
-    pub fn count_failed(&self) -> usize {
+    pub fn count_failed(&self) -> u64 {
         self.succeed.values()
             .filter(|value| value.map(|flag| !flag).unwrap_or(false))
-            .count()
+            .count() as u64
     }
 
     /// Returns the count of shape sequences for which results were found.
@@ -231,10 +231,10 @@ impl PcResults {
     /// assert_eq!(result.count_accepted(), 3);
     /// ```
     #[inline]
-    pub fn count_accepted(&self) -> usize {
+    pub fn count_accepted(&self) -> u64 {
         self.succeed.values()
             .filter(|value| value.is_some())
-            .count()
+            .count() as u64
     }
 
     /// Returns the count of shape sequences for which results are not yet found.
@@ -257,10 +257,10 @@ impl PcResults {
     /// assert_eq!(result.count_pending(), 1);
     /// ```
     #[inline]
-    pub fn count_pending(&self) -> usize {
+    pub fn count_pending(&self) -> u64 {
         self.succeed.values()
             .filter(|value| value.is_none())
-            .count()
+            .count() as u64
     }
 
     /// Return the count of all shape sequences independent of the result.
