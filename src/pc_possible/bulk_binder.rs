@@ -47,14 +47,14 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
 
     // See `PcPossibleBulkExecutor::{try_new, execute}` for more details.
     pub fn try_execute(&self) -> Result<PcResults, PcPossibleExecutorBulkCreationError> {
-        let move_rules = MoveRules::new(self.rotation_system.clone(), self.allow_move);
+        let move_rules = MoveRules::new(self.rotation_system.as_ref(), self.allow_move);
         let executor = self.try_bind(&move_rules)?;
         Ok(executor.execute())
     }
 
     // See `PcPossibleBulkExecutor::{try_new, execute_with_early_stopping}` for more details.
     pub fn try_execute_with_early_stopping(&self, early_stopping: impl Fn(&PcResults) -> ExecuteInstruction) -> Result<PcResults, PcPossibleExecutorBulkCreationError> {
-        let move_rules = MoveRules::new(self.rotation_system.clone(), self.allow_move);
+        let move_rules = MoveRules::new(self.rotation_system.as_ref(), self.allow_move);
         let executor = self.try_bind(&move_rules)?;
         Ok(executor.execute_with_early_stopping(early_stopping))
     }

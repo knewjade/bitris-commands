@@ -118,6 +118,8 @@ mod tests {
                         Permutation(ShapeCounter::one_of_each(), 3),
                     ]));
 
+                    binder.allows_hold = false;
+
                     binder
                 },
                 succeed: 67,
@@ -160,6 +162,82 @@ mod tests {
                 },
                 succeed: 5,
                 accepted: 7,
+            },
+            PcPossibleTestingData {
+                id: format!("harddrop-only"),
+                generator: || {
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
+
+                    let board = Board64::from_str("
+                        ######....
+                        ######....
+                        ######....
+                        ######....
+                    ").unwrap();
+                    let height = 4;
+                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
+
+                    binder.pattern = Rc::from(Pattern::new(vec![
+                        Permutation(ShapeCounter::one_of_each(), 5),
+                    ]));
+
+                    binder.allow_move = AllowMove::Harddrop;
+
+                    binder
+                },
+                succeed: 1552,
+                accepted: 2520,
+            },
+            PcPossibleTestingData {
+                id: format!("contains-no-extra-piece-hold"),
+                generator: || {
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
+
+                    let board = Board64::from_str("
+                        ######....
+                        ######....
+                        ######....
+                        ######....
+                    ").unwrap();
+                    let height = 4;
+                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
+
+                    binder.pattern = Rc::from(Pattern::new(vec![
+                        Permutation(ShapeCounter::one_of_each(), 4),
+                    ]));
+
+                    binder.allow_move = AllowMove::Harddrop;
+
+                    binder
+                },
+                succeed: 314,
+                accepted: 840,
+            },
+            PcPossibleTestingData {
+                id: format!("contains-no-extra-piece-no-hold"),
+                generator: || {
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
+
+                    let board = Board64::from_str("
+                        ######....
+                        ######....
+                        ######....
+                        ######....
+                    ").unwrap();
+                    let height = 4;
+                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
+
+                    binder.pattern = Rc::from(Pattern::new(vec![
+                        Permutation(ShapeCounter::one_of_each(), 4),
+                    ]));
+
+                    binder.allow_move = AllowMove::Harddrop;
+                    binder.allows_hold = false;
+
+                    binder
+                },
+                succeed: 116,
+                accepted: 840,
             },
         ];
 

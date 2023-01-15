@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use std::ops::Not;
     use std::rc::Rc;
     use std::slice::Iter;
     use std::str::FromStr;
@@ -7,13 +8,15 @@ mod tests {
     use bitris_commands::pc_possible::*;
     use bitris_commands::prelude::*;
 
-    // Finds PCs in bulk with SRS.
+    // Finds a PC with SRS.
     #[test]
-    fn bulk_with_srs() {
-        // Makes a binder with SRS & Softdrop.
-        // Because of the type system, changes require the re-making of the binder.
-        let move_type = MoveType::Softdrop;
-        let mut binder = PcPossibleBulkExecutorBinder::srs(move_type);
+    fn srs() {
+        // Makes a binder with SRS. The rotation system changes require the re-making of the binder because of the type system.
+        // Default values are already set in Binder. Please check the documentation of `PcPossibleExecutorBinder::default()` for details.
+        let mut binder = PcPossibleExecutorBinder::srs();
+
+        // Set softdrop to allow move.
+        binder.allow_move = AllowMove::Softdrop;
 
         // Sets a board and goal for 4 lines PC.
         let board = Board64::from_str("
@@ -26,21 +29,53 @@ mod tests {
         binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
 
         // Sets sequences in which you want the PC to be checked.
+        use Shape::*;
+        binder.shape_order = Rc::from(ShapeOrder::new(vec![
+            I, T, O, L, J,
+        ]));
+
+        // Whether or not to allow hold.
+        binder.allows_hold = true;
+
+        // Finds a PC. If it contains an invalid configuration, an error is returned.
+        let succeed = binder.try_execute().expect("Failed to execute");
+        assert!(succeed); // PC possible
+
+        // The binder is reusable.
+        binder.shape_order = Rc::from(ShapeOrder::new(vec![
+            S, S, S, S,
+        ]));
+        let succeed = binder.try_execute().expect("Failed to execute");
+        assert!(succeed.not()); // PC impossible
+    }
+
+    // Finds PCs in bulk with SRS.
+    #[test]
+    fn bulk_with_srs() {
+        // You can also process them all together efficiently with `PcPossibleBulkExecutorBinder`.
+        let mut binder = PcPossibleBulkExecutorBinder::srs();
+
+        // Sets sequences in which you want the PC to be checked.
         // The following represents 'I****'.
         binder.pattern = Rc::from(Pattern::new(vec![
             PatternElement::One(Shape::I),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
         ]));
 
-        // Whether or not to allow hold.
+        // The others are the same.
+        let board = Board64::from_str("
+            ###.....##
+            ###....###
+            ###...####
+            ###....###
+        ").expect("Failed to create a board.");
+        let height = 4;
+        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
+        binder.allow_move = AllowMove::Softdrop;
         binder.allows_hold = true;
 
-        // Binds the configuration to the executor.
-        // The lifetime of this executor matches the binder.
-        let executor = binder.try_bind().expect("Failed to bind");
-
-        // Finds PCs.
-        let results = executor.execute();
+        // Finds PCs. If it contains an invalid configuration, an error is returned.
+        let results = binder.try_execute().expect("Failed to execute");
 
         // You can take the result out of the return value.
         assert_eq!(results.count_succeed(), 711);
@@ -73,9 +108,13 @@ mod tests {
     // Use early stopping.
     #[test]
     fn bulk_using_early_stopping() {
-        // Makes a binder with SRS & Harddrop.
-        let move_type = MoveType::Harddrop;
-        let mut binder = PcPossibleBulkExecutorBinder::srs(move_type);
+        // Makes a binder.
+        let mut binder = PcPossibleBulkExecutorBinder::srs();
+
+        // The following represents the use of all shapes one at a time.
+        binder.pattern = Rc::from(Pattern::new(vec![
+            PatternElement::Factorial(ShapeCounter::one_of_each()),
+        ]));
 
         let board = Board64::from_str("
             ..........
@@ -85,24 +124,16 @@ mod tests {
         ").expect("Failed to create a board.");
         let height = 4;
         binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
-
-        // The following represents the use of all shapes one at a time.
-        binder.pattern = Rc::from(Pattern::new(vec![
-            PatternElement::Factorial(ShapeCounter::one_of_each()),
-        ]));
-
         binder.allows_hold = false;
 
-        let executor = binder.try_bind().expect("Failed to bind");
-
-        // Stops after 10 failures.
-        let result = executor.execute_with_early_stopping(|results| {
+        // Executes and stops after 10 failures.
+        let result = binder.try_execute_with_early_stopping(|results| {
             if results.count_failed() < 10 {
                 ExecuteInstruction::Continue
             } else {
                 ExecuteInstruction::Stop
             }
-        });
+        }).expect("Failed to execute");
         assert_eq!(result.count_failed(), 10);
 
         // Unexplored sequences will exist.
@@ -113,13 +144,27 @@ mod tests {
     // Use with customized kicks
     #[test]
     fn customized_kick() {
-        // Makes a binder with customized kicks.
-        let kick_table = MyKickTable;
-        let move_type = MoveType::Softdrop;
-        let move_rules = MoveRules::new(Rc::from(kick_table), move_type);
-        let mut binder = PcPossibleBulkExecutorBinder::default(move_rules);
+        struct MyKickTable;
 
-        // After that, it's the same as normal.
+        impl RotationSystem for MyKickTable {
+            fn iter_kicks(&self, piece: Piece, _: Rotation) -> Iter<'_, Kick> {
+                const KICK: [Kick; 1] = [Kick::new(Offset::new(0, 0))];
+                match piece.shape {
+                    Shape::O => [].iter(), // Cannot rotate
+                    _ => KICK.iter(), // Rotatable, but no kick
+                }
+            }
+
+            fn is_moving_in_rotation(&self, shape: Shape) -> bool {
+                shape != Shape::O
+            }
+        }
+
+        // Makes a binder with customized kicks.
+        let rotation_system = Rc::from(MyKickTable);
+        let mut binder = PcPossibleBulkExecutorBinder::default(rotation_system);
+
+        // The others are the same.
         let board = Board64::from_str("
             ###.....##
             ###....###
@@ -133,25 +178,44 @@ mod tests {
             PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
         ]));
 
-        let executor = binder.try_bind().expect("Failed to bind.");
-        let results = executor.execute();
+        let results = binder.try_execute().expect("Failed to execute");
         assert_eq!(results.count_succeed(), 485);
         assert_eq!(results.count_accepted(), 840);
     }
 
-    struct MyKickTable;
+    // Execute more efficiently.
+    #[test]
+    fn use_the_executor_directly() {
+        // You can also make an executor directly.
+        // However, you will need to understand the more internal structures and the lifetime.
 
-    impl RotationSystem for MyKickTable {
-        fn iter_kicks(&self, piece: Piece, _: Rotation) -> Iter<'_, Kick> {
-            const KICK: [Kick; 1] = [Kick::new(Offset::new(0, 0))];
-            match piece.shape {
-                Shape::O => [].iter(), // Cannot rotate
-                _ => KICK.iter(), // Rotatable, but no kick
-            }
-        }
+        let move_rules = MoveRules::new(&SrsKickTable, AllowMove::Softdrop);
 
-        fn is_moving_in_rotation(&self, shape: Shape) -> bool {
-            shape != Shape::O
-        }
+        let board = Board64::from_str("
+            ###.....##
+            ###....###
+            ###...####
+            ###....###
+        ").expect("Failed to create a board.");
+        let height = 4;
+        let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
+
+        let pattern = Pattern::new(vec![
+            PatternElement::One(Shape::I),
+            PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
+        ]);
+
+        let allows_hold = true;
+
+        let executor = PcPossibleBulkExecutor::try_new(
+            &move_rules,
+            clipped_board,
+            &pattern,
+            allows_hold,
+        ).expect("Failed to make an executor.");
+
+        let results = executor.execute();
+        assert_eq!(results.count_succeed(), 711);
+        assert_eq!(results.count_accepted(), 840);
     }
 }

@@ -79,10 +79,11 @@ pub enum PcPossibleExecutorBulkCreationError {
 /// The executor to find PC possibles.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub struct PcPossibleBulkExecutor<'a, T: RotationSystem> {
-    move_rules: &'a MoveRules<T>,
+    move_rules: &'a MoveRules<'a, T>,
     clipped_board: ClippedBoard,
     pattern: &'a Pattern,
     allows_hold: bool,
+    has_extra_shapes: bool,
 }
 
 /// A collection of statements that instruct execution to continue/stop.
@@ -153,9 +154,9 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 
         debug_assert!(0 < clipped_board.spaces());
 
-        let allows_hold = allows_hold && (clipped_board.spaces() / 4 < dimension);
+        let has_extra_shapes = clipped_board.spaces() / 4 < dimension;
 
-        Ok(Self { move_rules, clipped_board, pattern, allows_hold })
+        Ok(Self { move_rules, clipped_board, pattern, allows_hold, has_extra_shapes })
     }
 
     /// Start the search for PC possible in bulk.
@@ -339,7 +340,8 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
             let shape_order = next_cursor.unused_shapes();
             let rest_shapes = shape_order.shapes();
             let next_parity = parity.place(placement);
-            if !next_parity.validates(rest_shapes, 0, self.allows_hold) {
+            // The flag is off if the hold is enabled but does not have an extra piece (because parity is not affected by the shape order)
+            if !next_parity.validates(rest_shapes, 0, self.allows_hold && self.has_extra_shapes) {
                 continue;
             }
 
