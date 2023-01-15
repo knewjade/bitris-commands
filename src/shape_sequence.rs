@@ -24,7 +24,7 @@ impl ShapeSequence {
     }
 
     #[inline]
-    pub fn to_order(&self) -> ShapeOrder {
+    pub fn to_shape_order(&self) -> ShapeOrder {
         ShapeOrder::new(self.shapes.clone())
     }
 }
@@ -36,6 +36,12 @@ impl ShapeSequence {
     #[allow(dead_code)]
     fn infer_input(&self, infer_size: usize) -> Vec<FuzzyShapeOrder> {
         assert!(self.shapes.len() <= infer_size);
+
+        if self.shapes.is_empty() {
+            let mut shapes = Vec::<FuzzyShape>::with_capacity(infer_size);
+            shapes.resize(infer_size, FuzzyShape::Unknown);
+            return vec![FuzzyShapeOrder::new(shapes)];
+        }
 
         pub struct FuzzyOrderVecAggregator {
             orders: Vec<FuzzyShapeOrder>,
@@ -129,6 +135,28 @@ mod tests {
 
         let orders = shape_sequence.infer_input(4);
         assert_eq!(orders.len(), 8);
+    }
+
+    #[test]
+    fn infer_input_from_empty() {
+        use FuzzyShape::*;
+
+        let shape_sequence = ShapeSequence::new(vec![]);
+
+        let orders = shape_sequence.infer_input(0);
+        assert_eq!(orders, vec![
+            FuzzyShapeOrder::new(vec![]),
+        ]);
+
+        let orders = shape_sequence.infer_input(1);
+        assert_eq!(orders, vec![
+            FuzzyShapeOrder::new(vec![Unknown]),
+        ]);
+
+        let orders = shape_sequence.infer_input(2);
+        assert_eq!(orders, vec![
+            FuzzyShapeOrder::new(vec![Unknown, Unknown]),
+        ]);
     }
 
     #[test]

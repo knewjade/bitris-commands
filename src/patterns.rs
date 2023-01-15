@@ -15,17 +15,22 @@ fn calculate_permutation_size(len: usize, pop: usize) -> usize {
 /// A collection of elements to define the order/sequence of the shapes.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum PatternElement {
-    /// A fixed shape
+    /// A fixed shape (like `T`)
     One(Shape),
 
-    /// Fixed shapes
+    /// A sequence fixed shapes (like `TIO`)
     Fixed(BitShapes),
 
-    /// One from all shapes
+    /// One from all shapes (like. `*`)
     Wildcard,
 
-    /// Permutations by taking `usize` shapes from `ShapeCounter`
+    /// Permutations by taking `usize` shapes from `ShapeCounter`. Duplicates are not removed.
+    /// (like `[TIO]p2`)
     Permutation(ShapeCounter, usize),
+
+    /// Permutations by taking all shapes from `ShapeCounter`. Duplicates are not removed.
+    /// (like `[TIOLJSZ]p7`, `*!`)
+    Factorial(ShapeCounter),
 }
 
 impl PatternElement {
@@ -36,9 +41,16 @@ impl PatternElement {
             PatternElement::Fixed(shapes) => vec![shapes.to_vec()],
             PatternElement::Wildcard => Shape::all_into_iter().map(|it| vec![it]).collect(),
             PatternElement::Permutation(counter, pop) => {
+                assert!(0 < pop && pop <= counter.len());
                 counter.to_pairs().into_iter()
                     .flat_map(|(shape, count)| { repeat_n(shape, count as usize).into_iter() })
                     .permutations(pop)
+                    .collect_vec()
+            }
+            PatternElement::Factorial(counter) => {
+                counter.to_pairs().into_iter()
+                    .flat_map(|(shape, count)| { repeat_n(shape, count as usize).into_iter() })
+                    .permutations(counter.len())
                     .collect_vec()
             }
         }
@@ -50,7 +62,11 @@ impl PatternElement {
             PatternElement::One(_) => 1,
             PatternElement::Fixed(_) => 1,
             PatternElement::Wildcard => 7,
-            PatternElement::Permutation(counter, pop) => calculate_permutation_size(counter.total_size(), pop),
+            PatternElement::Permutation(counter, pop) => {
+                assert!(0 < pop && pop <= counter.len());
+                calculate_permutation_size(counter.len(), pop)
+            }
+            PatternElement::Factorial(counter) => calculate_permutation_size(counter.len(), counter.len()),
         }
     }
 
@@ -60,7 +76,11 @@ impl PatternElement {
             PatternElement::One(_) => 1,
             PatternElement::Fixed(shapes) => shapes.len(),
             PatternElement::Wildcard => 1,
-            PatternElement::Permutation(_, pop) => pop,
+            PatternElement::Permutation(counter, pop) => {
+                assert!(0 < pop && pop <= counter.len());
+                pop
+            }
+            PatternElement::Factorial(counter) => counter.len(),
         }
     }
 }
@@ -70,17 +90,17 @@ impl PatternElement {
 /// use bitris_commands::prelude::*;
 /// use PatternElement::*;
 ///
-/// let patterns = Pattern::new(vec![One(Shape::T), Wildcard, Wildcard]);
-/// assert_eq!(patterns.len_shapes_vec(), 49);
-/// assert_eq!(patterns.dim_shapes(), 3);
+/// let pattern = Pattern::new(vec![One(Shape::T), Wildcard, Wildcard]);
+/// assert_eq!(pattern.len_shapes_vec(), 49);
+/// assert_eq!(pattern.dim_shapes(), 3);
 ///
-/// let patterns = Pattern::new(vec![Fixed(BitShapes::try_from(vec![Shape::T, Shape::I]).unwrap())]);
-/// assert_eq!(patterns.len_shapes_vec(), 1);
-/// assert_eq!(patterns.dim_shapes(), 2);
+/// let pattern = Pattern::new(vec![Fixed(BitShapes::try_from(vec![Shape::T, Shape::I]).unwrap())]);
+/// assert_eq!(pattern.len_shapes_vec(), 1);
+/// assert_eq!(pattern.dim_shapes(), 2);
 ///
-/// let patterns = Pattern::new(vec![Permutation(ShapeCounter::one_of_each(), 3)]);
-/// assert_eq!(patterns.len_shapes_vec(), 210);
-/// assert_eq!(patterns.dim_shapes(), 3);
+/// let pattern = Pattern::new(vec![Permutation(ShapeCounter::one_of_each(), 3)]);
+/// assert_eq!(pattern.len_shapes_vec(), 210);
+/// assert_eq!(pattern.dim_shapes(), 3);
 /// ```
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Constructor)]
 pub struct Pattern {
@@ -173,9 +193,7 @@ impl Pattern {
 
     /// The number of elements in one shapes.
     pub fn dim_shapes(&self) -> usize {
-        if self.elements.is_empty() {
-            return 0;
-        }
+        assert!(!self.elements.is_empty(), "The pattern do not have shapes.");
         self.elements.iter()
             .map(|it| it.dim_shapes())
             .fold(0, |sum, it| sum + it)
@@ -232,11 +250,25 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn invalid_pattern_permutation() {
+        let counter = ShapeCounter::from(vec![Shape::I]);
+        let invalid_pattern = PatternElement::Permutation(counter, 2);
+        invalid_pattern.dim_shapes();
+    }
+
+    #[test]
     fn empty() {
-        let patterns = Pattern::new(vec![]);
-        assert_eq!(patterns.len_shapes_vec(), 0);
-        assert_eq!(patterns.dim_shapes(), 0);
-        assert_eq!(patterns.to_sequences().len(), 0);
+        let pattern = Pattern::new(vec![]);
+        assert_eq!(pattern.len_shapes_vec(), 0);
+        assert_eq!(pattern.to_sequences().len(), 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn empty_dim() {
+        let pattern = Pattern::new(vec![]);
+        pattern.dim_shapes();
     }
 
     #[test]

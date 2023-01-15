@@ -1,17 +1,20 @@
 extern crate core;
 
 pub use bit_shapes::*;
+pub use clipped_board::*;
 pub use shape_sequence::*;
 pub use patterns::*;
 pub use shape_order::*;
 pub use shape_counter::*;
 pub use traits::*;
 
+#[doc(hidden)]
 pub mod prelude {
     pub use bitris::prelude::*;
 
     pub use crate::{
         bit_shapes::*,
+        clipped_board::*,
         shape_sequence::*,
         patterns::*,
         shape_order::*,
@@ -20,9 +23,10 @@ pub mod prelude {
     };
 }
 
-pub mod commands;
+pub mod pc_possible;
 
 mod bit_shapes;
+mod clipped_board;
 mod shape_sequence;
 mod patterns;
 mod shape_order;

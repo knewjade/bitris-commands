@@ -1,0 +1,11 @@
+[package]
+name = "acceptance_tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bitris_commands = { path = ".." }
+
+[profile.test]
+opt-level = 3
+debug = false
