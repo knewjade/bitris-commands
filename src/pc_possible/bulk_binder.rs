@@ -9,7 +9,8 @@ use crate::pc_possible::{ExecuteInstruction, PcPossibleBulkExecutor, PcPossibleE
 /// The binder to hold and tie settings for `PcPossibleBulkExecutor`.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub struct PcPossibleBulkExecutorBinder<T: RotationSystem> {
-    pub move_rules: MoveRules<T>,
+    pub rotation_system: Rc<T>,
+    pub allow_move: AllowMove,
     pub clipped_board: ClippedBoard,
     pub pattern: Rc<Pattern>,
     pub allows_hold: bool,
@@ -17,8 +18,8 @@ pub struct PcPossibleBulkExecutorBinder<T: RotationSystem> {
 
 impl PcPossibleBulkExecutorBinder<SrsKickTable> {
     /// Making the executor with SRS. See `PcPossibleBulkExecutorBinder::default()` for more details.
-    pub fn srs(move_type: MoveType) -> Self {
-        PcPossibleBulkExecutorBinder::default(MoveRules::srs(move_type))
+    pub fn srs() -> Self {
+        PcPossibleBulkExecutorBinder::default(Rc::from(SrsKickTable))
     }
 }
 
@@ -26,14 +27,16 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
     /// Making the executor with default.
     ///
     /// The default values are as follows:
-    ///   + [required] move rules: from argument
+    ///   + [required] rotation_system: set an argument (wrapped by Rc)
+    ///   + allow move: softdrop
     ///   + board: blank
     ///   + height: 4 lines
     ///   + pattern: factorial of all shapes (like `*p7`)
     ///   + allows hold: yes
-    pub fn default(move_rules: MoveRules<T>) -> Self {
+    pub fn default(rotation_system: Rc<T>) -> Self {
         Self {
-            move_rules,
+            rotation_system,
+            allow_move: AllowMove::Softdrop,
             clipped_board: ClippedBoard::try_new(Board64::blank(), 4).unwrap(),
             pattern: Rc::from(Pattern::new(vec![
                 PatternElement::Factorial(ShapeCounter::one_of_each()),
@@ -44,19 +47,21 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
 
     // See `PcPossibleBulkExecutor::{try_new, execute}` for more details.
     pub fn try_execute(&self) -> Result<PcResults, PcPossibleExecutorBulkCreationError> {
-        let executor = self.try_bind()?;
+        let move_rules = MoveRules::new(self.rotation_system.clone(), self.allow_move);
+        let executor = self.try_bind(&move_rules)?;
         Ok(executor.execute())
     }
 
     // See `PcPossibleBulkExecutor::{try_new, execute_with_early_stopping}` for more details.
     pub fn try_execute_with_early_stopping(&self, early_stopping: impl Fn(&PcResults) -> ExecuteInstruction) -> Result<PcResults, PcPossibleExecutorBulkCreationError> {
-        let executor = self.try_bind()?;
+        let move_rules = MoveRules::new(self.rotation_system.clone(), self.allow_move);
+        let executor = self.try_bind(&move_rules)?;
         Ok(executor.execute_with_early_stopping(early_stopping))
     }
 
-    fn try_bind(&self) -> Result<PcPossibleBulkExecutor<T>, PcPossibleExecutorBulkCreationError> {
+    fn try_bind<'a>(&'a self, move_rules: &'a MoveRules<T>) -> Result<PcPossibleBulkExecutor<T>, PcPossibleExecutorBulkCreationError> {
         PcPossibleBulkExecutor::try_new(
-            &self.move_rules,
+            move_rules,
             self.clipped_board,
             self.pattern.as_ref(),
             self.allows_hold,
@@ -79,7 +84,7 @@ mod tests {
     fn reuse() {
         use PatternElement::*;
 
-        let mut binder = PcPossibleBulkExecutorBinder::srs(MoveType::Softdrop);
+        let mut binder = PcPossibleBulkExecutorBinder::srs();
         let board = Board64::from_str("
             ####......
             ####......

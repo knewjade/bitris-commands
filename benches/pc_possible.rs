@@ -8,7 +8,7 @@ use bitris_commands::prelude::*;
 
 #[inline(always)]
 fn pc_possible(data: &PcPossibleBenchmarkData) {
-    let move_rules = MoveRules::srs(MoveType::Softdrop);
+    let move_rules = MoveRules::srs(AllowMove::Softdrop);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
     let executor = pc_possible::PcPossibleBulkExecutor::try_new(
         &move_rules, clipped_board, &data.patterns, true,

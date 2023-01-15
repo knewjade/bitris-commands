@@ -99,11 +99,11 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// See `PcPossibleBulkExecutorCreationError` for error patterns.
     /// ```
     /// use std::str::FromStr;
-    /// use bitris::{Shape, Board64, MoveRules, MoveType};
+    /// use bitris::{Shape, Board64, MoveRules, AllowMove};
     /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
     /// use bitris_commands::pc_possible::PcPossibleBulkExecutor;
     ///
-    /// let move_rules = MoveRules::srs(MoveType::Softdrop);
+    /// let move_rules = MoveRules::srs(AllowMove::Softdrop);
     ///
     /// let board = Board64::from_str("
     ///     XXX.....XX
@@ -167,11 +167,11 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// If the clojure returns `ExecuteInstruction::Stop`, it stops.
     /// ```
     /// use std::str::FromStr;
-    /// use bitris::{Board64, MoveRules, MoveType};
+    /// use bitris::{Board64, MoveRules, AllowMove};
     /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
     /// use bitris_commands::pc_possible::{ExecuteInstruction, PcPossibleBulkExecutor};
     ///
-    /// let move_rules = MoveRules::srs(MoveType::Softdrop);
+    /// let move_rules = MoveRules::srs(AllowMove::Softdrop);
     ///
     /// let board = Board64::from_str("
     ///     ......####
@@ -359,7 +359,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 mod tests {
     use std::str::FromStr;
 
-    use bitris::{Board64, MoveRules, MoveType, Shape};
+    use bitris::{Board64, MoveRules, AllowMove, Shape};
 
     use crate::{BitShapes, ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
     use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
@@ -379,7 +379,7 @@ mod tests {
         let pattern = Pattern::new(vec![
             Permutation(ShapeCounter::one_of_each(), 3),
         ]);
-        let move_rules = MoveRules::srs(MoveType::Softdrop);
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         let executor = PcPossibleBulkExecutor::try_new(
             &move_rules, clipped_board, &pattern, true,
@@ -406,7 +406,7 @@ mod tests {
             #####..###
         ").unwrap();
         let clipped_board = ClippedBoard::try_new(board, 3).unwrap();
-        let move_rules = MoveRules::srs(MoveType::Softdrop);
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         {
             let single_pattern = Pattern::new(vec![
@@ -440,7 +440,7 @@ mod tests {
             One(Shape::O),
             One(Shape::O),
         ]);
-        let move_rules = MoveRules::srs(MoveType::Softdrop);
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
             PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
             PcPossibleExecutorBulkCreationError::UnexpectedBoardSpaces,
@@ -458,7 +458,7 @@ mod tests {
         let pattern = Pattern::new(vec![
             One(Shape::O),
         ]);
-        let move_rules = MoveRules::srs(MoveType::Softdrop);
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
             PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
             PcPossibleExecutorBulkCreationError::ShortPatternDimension,
@@ -473,7 +473,7 @@ mod tests {
         ").unwrap();
         let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
         let pattern = Pattern::default();
-        let move_rules = MoveRules::srs(MoveType::Softdrop);
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
             PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
             PcPossibleExecutorBulkCreationError::PatternIsEmpty,

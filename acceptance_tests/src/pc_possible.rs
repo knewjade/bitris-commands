@@ -22,7 +22,7 @@ mod tests {
             PcPossibleTestingData {
                 id: format!("1st-ILSZ-hold"),
                 generator: || {
-                    let mut binder = PcPossibleBulkExecutorBinder::srs(MoveType::Softdrop);
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
 
                     let board = Board64::from_str("
                         #......###
@@ -50,7 +50,7 @@ mod tests {
             PcPossibleTestingData {
                 id: format!("1st-ILSZ-no-hold"),
                 generator: || {
-                    let mut binder = PcPossibleBulkExecutorBinder::srs(MoveType::Softdrop);
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
 
                     let board = Board64::from_str("
                         #......###
@@ -78,7 +78,7 @@ mod tests {
             PcPossibleTestingData {
                 id: format!("1st-grace-system-hold"),
                 generator: || {
-                    let mut binder = PcPossibleBulkExecutorBinder::srs(MoveType::Softdrop);
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
 
                     let board = Board64::from_str("
                         ######....
@@ -102,7 +102,7 @@ mod tests {
             PcPossibleTestingData {
                 id: format!("1st-grace-system-no-hold"),
                 generator: || {
-                    let mut binder = PcPossibleBulkExecutorBinder::srs(MoveType::Softdrop);
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
 
                     let board = Board64::from_str("
                         ######....
@@ -126,7 +126,7 @@ mod tests {
             PcPossibleTestingData {
                 id: format!("2nd-LSZT"),
                 generator: || {
-                    let mut binder = PcPossibleBulkExecutorBinder::srs(MoveType::Softdrop);
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
 
                     let board = Board64::from_str("
                         #.........
@@ -145,7 +145,7 @@ mod tests {
             PcPossibleTestingData {
                 id: format!("empty"),
                 generator: || {
-                    let mut binder = PcPossibleBulkExecutorBinder::srs(MoveType::Softdrop);
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
 
                     binder.pattern = Rc::from(Pattern::new(vec![
                         Fixed(BitShapes::try_from(vec![
