@@ -8,8 +8,8 @@ mod tests {
 
     struct PcPossibleTestingData {
         id: String,
-        succeed: usize,
-        accepted: usize,
+        succeed: u64,
+        accepted: u64,
         generator: fn() -> PcPossibleBulkExecutorBinder<SrsKickTable>,
     }
 
