@@ -14,6 +14,8 @@ pub enum PcPossibleExecutorCreationError {
     UnexpectedBoardSpaces,
     #[error("The order is too short to take a PC.")]
     ShortOrderDimension,
+    #[error("Board height exceeds the upper limit. Up to 56 are supported.")]
+    BoardIsTooHigh,
 }
 
 /// The binder to hold and tie settings for `PcPossibleExecutor`.
@@ -69,6 +71,7 @@ impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
                 match error {
                     From::UnexpectedBoardSpaces => To::UnexpectedBoardSpaces,
                     From::ShortPatternDimension | From::PatternIsEmpty => To::ShortOrderDimension,
+                    From::BoardIsTooHigh => To::BoardIsTooHigh,
                 }
             })
     }

@@ -74,6 +74,8 @@ pub enum PcPossibleExecutorBulkCreationError {
     ShortPatternDimension,
     #[error("The pattern does not have shape sequences.")]
     PatternIsEmpty,
+    #[error("Board height exceeds the upper limit. Up to 56 are supported.")]
+    BoardIsTooHigh,
 }
 
 /// The executor to find PC possibles.
@@ -84,6 +86,7 @@ pub struct PcPossibleBulkExecutor<'a, T: RotationSystem> {
     pattern: &'a Pattern,
     allows_hold: bool,
     has_extra_shapes: bool,
+    spawn_position: BlPosition,
 }
 
 /// A collection of statements that instruct execution to continue/stop.
@@ -96,7 +99,7 @@ pub enum ExecuteInstruction {
 impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// Make PcPossibleBulkExecutor.
     ///
-    /// Returns `Err()` if the setting is incorrect.
+    /// Returns `Err()` if the setting is incorrect or restricted.
     /// See `PcPossibleBulkExecutorCreationError` for error patterns.
     /// ```
     /// use std::str::FromStr;
@@ -139,6 +142,10 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     ) -> Result<Self, PcPossibleExecutorBulkCreationError> {
         use PcPossibleExecutorBulkCreationError::*;
 
+        if 56 < clipped_board.height() {
+            return Err(BoardIsTooHigh);
+        }
+
         if clipped_board.spaces() % 4 != 0 {
             return Err(UnexpectedBoardSpaces);
         }
@@ -156,7 +163,10 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 
         let has_extra_shapes = clipped_board.spaces() / 4 < dimension;
 
-        Ok(Self { move_rules, clipped_board, pattern, allows_hold, has_extra_shapes })
+        // Spawn above the height so that it is not stuck when harddrop only.
+        let spawn_position = bl(5, clipped_board.height() as i32 + 4);
+
+        Ok(Self { move_rules, clipped_board, pattern, allows_hold, has_extra_shapes, spawn_position })
     }
 
     /// Start the search for PC possible in bulk.
@@ -308,8 +318,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     ) -> Option<ShapeSequence> {
         buffer.increment(shape);
 
-        const POSITION: BlPosition = bl(5, 20);
-        let placement = shape.with(Orientation::North).with(POSITION);
+        let placement = shape.with(Orientation::North).with(self.spawn_position);
         let moves = self.move_rules.generate_minimized_moves(clipped_board.board(), placement);
 
         for placement in moves {
@@ -361,7 +370,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 mod tests {
     use std::str::FromStr;
 
-    use bitris::{Board64, MoveRules, AllowMove, Shape};
+    use bitris::{AllowMove, Board64, BoardOp, MoveRules, Shape, xy};
 
     use crate::{BitShapes, ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
     use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
@@ -479,6 +488,53 @@ mod tests {
         assert_eq!(
             PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
             PcPossibleExecutorBulkCreationError::PatternIsEmpty,
+        );
+    }
+
+    #[test]
+    fn maximum_height() {
+        let height: u32 = 56;
+        let mut board = Board64::blank();
+        for y in 0..height as i32 {
+            for x in 0..9 {
+                board.set_at(xy(x, y));
+            }
+        }
+
+        let clipped_board = ClippedBoard::try_new(board, height).unwrap();
+        let pattern = Pattern::new(vec![
+            PatternElement::One(Shape::I),
+        ].repeat((height / 4) as usize));
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
+
+        let executor = PcPossibleBulkExecutor::try_new(
+            &move_rules, clipped_board, &pattern, true,
+        ).unwrap();
+        let result = executor.execute();
+        assert_eq!(result.count_succeed(), 1);
+    }
+
+    #[test]
+    fn error_exceeds_the_height_limit() {
+        let height: u32 = 57;
+        let mut board = Board64::blank();
+        for y in 0..56 as i32 {
+            for x in 0..9 {
+                board.set_at(xy(x, y));
+            }
+        }
+        for x in 0..6 {
+            board.set_at(xy(x, 56));
+        }
+
+        let clipped_board = ClippedBoard::try_new(board, height).unwrap();
+        let pattern = Pattern::new(vec![
+            PatternElement::One(Shape::I),
+        ].repeat((height / 4) as usize + 2));
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
+        assert_eq!(
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleExecutorBulkCreationError::BoardIsTooHigh,
         );
     }
 }
