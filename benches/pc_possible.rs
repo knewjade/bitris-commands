@@ -23,7 +23,7 @@ struct PcPossibleBenchmarkData {
     board: Board64,
     height: u32,
     patterns: Rc<Pattern>,
-    expected: usize,
+    expected: u64,
 }
 
 fn bench_pc_possibles(c: &mut Criterion) {
