@@ -123,6 +123,12 @@ impl TryFrom<Vec<PatternElement>> for Pattern {
     type Error = PatternCreationError;
 
     fn try_from(elements: Vec<PatternElement>) -> Result<Self, Self::Error> {
+        Pattern::try_new(elements)
+    }
+}
+
+impl Pattern {
+    fn try_new(elements: Vec<PatternElement>) -> Result<Self, PatternCreationError> {
         use PatternElement::*;
         use PatternCreationError::*;
 
@@ -143,9 +149,7 @@ impl TryFrom<Vec<PatternElement>> for Pattern {
 
         Ok(Self { elements })
     }
-}
 
-impl Pattern {
     #[allow(dead_code)]
     fn walk_shapes(&self, visitor: &mut impl ForEachVisitor<Vec<Shape>>) {
         let all_shapes_vec: Vec<Vec<Vec<Shape>>> = self.elements.clone()
