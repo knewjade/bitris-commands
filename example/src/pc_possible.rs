@@ -24,9 +24,9 @@ mod tests {
             ###....###
             ###...####
             ###....###
-        ").expect("Failed to create a board.");
+        ").expect("Failed to create a board");
         let height = 4;
-        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
+        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
 
         // Sets sequences in which you want the PC to be checked.
         use Shape::*;
@@ -57,10 +57,11 @@ mod tests {
 
         // Sets sequences in which you want the PC to be checked.
         // The following represents 'I****'.
-        binder.pattern = Rc::from(Pattern::new(vec![
+        let pattern = Pattern::try_from(vec![
             PatternElement::One(Shape::I),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
-        ]));
+        ]).expect("Failed to create a pattern");
+        binder.pattern = Rc::from(pattern);
 
         // The others are the same.
         let board = Board64::from_str("
@@ -68,9 +69,9 @@ mod tests {
             ###....###
             ###...####
             ###....###
-        ").expect("Failed to create a board.");
+        ").expect("Failed to create a board");
         let height = 4;
-        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
+        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
         binder.allow_move = AllowMove::Softdrop;
         binder.allows_hold = true;
 
@@ -112,18 +113,19 @@ mod tests {
         let mut binder = PcPossibleBulkExecutorBinder::srs();
 
         // The following represents the use of all shapes one at a time.
-        binder.pattern = Rc::from(Pattern::new(vec![
+        let pattern = Pattern::try_from(vec![
             PatternElement::Factorial(ShapeCounter::one_of_each()),
-        ]));
+        ]).expect("Failed to create a pattern");
+        binder.pattern = Rc::from(pattern);
 
         let board = Board64::from_str("
             ..........
             ....####..
             ....######
             ....######
-        ").expect("Failed to create a board.");
+        ").expect("Failed to create a board");
         let height = 4;
-        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
+        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
         binder.allows_hold = false;
 
         // Executes and stops after 10 failures.
@@ -170,13 +172,13 @@ mod tests {
             ###....###
             ###...####
             ###....###
-        ").expect("Failed to create a board.");
+        ").expect("Failed to create a board");
         let height = 4;
-        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
-        binder.pattern = Rc::from(Pattern::new(vec![
+        binder.clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
+        binder.pattern = Rc::from(Pattern::try_from(vec![
             PatternElement::One(Shape::I),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
-        ]));
+        ]).expect("Failed to create a pattern"));
 
         let results = binder.try_execute().expect("Failed to execute");
         assert_eq!(results.count_succeed(), 485);
@@ -196,14 +198,14 @@ mod tests {
             ###....###
             ###...####
             ###....###
-        ").expect("Failed to create a board.");
+        ").expect("Failed to create a board");
         let height = 4;
-        let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
+        let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
 
-        let pattern = Pattern::new(vec![
+        let pattern = Pattern::try_from(vec![
             PatternElement::One(Shape::I),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
-        ]);
+        ]).expect("Failed to create a pattern");
 
         let allows_hold = true;
 
@@ -212,7 +214,7 @@ mod tests {
             clipped_board,
             &pattern,
             allows_hold,
-        ).expect("Failed to make an executor.");
+        ).expect("Failed to make an executor");
 
         let results = executor.execute();
         assert_eq!(results.count_succeed(), 711);

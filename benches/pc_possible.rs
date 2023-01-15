@@ -41,9 +41,9 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ####...###
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::new(vec![
+            patterns: Rc::from(Pattern::try_from(vec![
                 Permutation(ShapeCounter::one_of_each(), 4),
-            ])),
+            ]).unwrap()),
             expected: 514,
         },
         PcPossibleBenchmarkData {
@@ -56,9 +56,9 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ###....###
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::new(vec![
+            patterns: Rc::from(Pattern::try_from(vec![
                 Permutation(ShapeCounter::one_of_each(), 5),
-            ])),
+            ]).unwrap()),
             expected: 1672,
         },
         PcPossibleBenchmarkData {
@@ -71,21 +71,21 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 #......###
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::new(vec![
+            patterns: Rc::from(Pattern::try_from(vec![
                 Factorial(ShapeCounter::one_of_each()),
-            ])),
+            ]).unwrap()),
             expected: 5028,
         },
         PcPossibleBenchmarkData {
             id: format!("1st-cycle-partial"),
             board: Board64::blank(),
             height: 4,
-            patterns: Rc::from(Pattern::new(vec![
+            patterns: Rc::from(Pattern::try_from(vec![
                 Fixed(BitShapes::try_from(vec![
                     T, I, O, S, L, J, Z, T, I, O,
                 ]).unwrap()),
                 Wildcard,
-            ])),
+            ]).unwrap()),
             expected: 7,
         },
         PcPossibleBenchmarkData {
@@ -98,10 +98,10 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ######....
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::new(vec![
+            patterns: Rc::from(Pattern::try_from(vec![
                 One(T),
                 Permutation(ShapeCounter::one_of_each(), 4),
-            ])),
+            ]).unwrap()),
             expected: 744,
         },
         PcPossibleBenchmarkData {
@@ -114,9 +114,9 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ....######
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::new(vec![
+            patterns: Rc::from(Pattern::try_from(vec![
                 Factorial(ShapeCounter::one_of_each()),
-            ])),
+            ]).unwrap()),
             expected: 4788,
         },
     ];

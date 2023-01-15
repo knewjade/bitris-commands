@@ -33,12 +33,12 @@ mod tests {
                     let height = 4;
                     binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
-                    binder.pattern = Rc::from(Pattern::new(vec![
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
                         Factorial(ShapeCounter::try_from(vec![
                             L, T, O,
                         ]).unwrap()),
                         Permutation(ShapeCounter::one_of_each(), 4),
-                    ]));
+                    ]).unwrap());
 
                     binder.allows_hold = true;
 
@@ -61,12 +61,12 @@ mod tests {
                     let height = 4;
                     binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
-                    binder.pattern = Rc::from(Pattern::new(vec![
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
                         Factorial(ShapeCounter::try_from(vec![
                             L, T, O,
                         ]).unwrap()),
                         Permutation(ShapeCounter::one_of_each(), 3),
-                    ]));
+                    ]).unwrap());
 
                     binder.allows_hold = false;
 
@@ -89,10 +89,10 @@ mod tests {
                     let height = 4;
                     binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
-                    binder.pattern = Rc::from(Pattern::new(vec![
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
                         One(T),
                         Permutation(ShapeCounter::one_of_each(), 4),
-                    ]));
+                    ]).unwrap());
 
                     binder
                 },
@@ -113,10 +113,10 @@ mod tests {
                     let height = 4;
                     binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
-                    binder.pattern = Rc::from(Pattern::new(vec![
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
                         One(T),
                         Permutation(ShapeCounter::one_of_each(), 3),
-                    ]));
+                    ]).unwrap());
 
                     binder.allows_hold = false;
 
@@ -149,12 +149,12 @@ mod tests {
                 generator: || {
                     let mut binder = PcPossibleBulkExecutorBinder::srs();
 
-                    binder.pattern = Rc::from(Pattern::new(vec![
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
                         Fixed(BitShapes::try_from(vec![
                             S, L, Z, O, S, L, S, J, O, Z,
                         ]).unwrap()),
                         Wildcard, // I or O is not PC-able
-                    ]));
+                    ]).unwrap());
 
                     binder.allows_hold = true;
 
@@ -177,9 +177,9 @@ mod tests {
                     let height = 4;
                     binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
-                    binder.pattern = Rc::from(Pattern::new(vec![
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
                         Permutation(ShapeCounter::one_of_each(), 5),
-                    ]));
+                    ]).unwrap());
 
                     binder.allow_move = AllowMove::Harddrop;
 
@@ -202,9 +202,9 @@ mod tests {
                     let height = 4;
                     binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
-                    binder.pattern = Rc::from(Pattern::new(vec![
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
                         Permutation(ShapeCounter::one_of_each(), 4),
-                    ]));
+                    ]).unwrap());
 
                     binder.allow_move = AllowMove::Harddrop;
 
@@ -227,9 +227,9 @@ mod tests {
                     let height = 4;
                     binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
-                    binder.pattern = Rc::from(Pattern::new(vec![
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
                         Permutation(ShapeCounter::one_of_each(), 4),
-                    ]));
+                    ]).unwrap());
 
                     binder.allow_move = AllowMove::Harddrop;
                     binder.allows_hold = false;

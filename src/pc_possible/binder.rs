@@ -2,9 +2,10 @@ use std::rc::Rc;
 
 use bitris::prelude::*;
 use bitris::srs::SrsKickTable;
+use itertools::Itertools;
 use thiserror::Error;
 
-use crate::{ClippedBoard, Pattern, PatternElement, ShapeOrder};
+use crate::{ClippedBoard, Pattern, PatternCreationError, PatternElement, ShapeOrder};
 use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
 
 /// A collection of errors that occur when making the executor.
@@ -57,21 +58,29 @@ impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
 
     // See `PcPossibleBulkExecutor::{try_new, execute}` for more details.
     pub fn try_execute(&self) -> Result<bool, PcPossibleExecutorCreationError> {
+        use PcPossibleExecutorBulkCreationError as FromError;
+        use PcPossibleExecutorCreationError as ToError;
+
         let move_rules = MoveRules::new(self.rotation_system.as_ref(), self.allow_move);
-        let pattern = Pattern::new(
-            self.shape_order.shapes().iter().map(|&shape| PatternElement::One(shape)).collect()
-        );
+        let pattern = match Pattern::try_from(
+            self.shape_order.shapes().iter().map(|&shape| PatternElement::One(shape)).collect_vec()
+        ) {
+            Ok(pattern) => pattern,
+            Err(error) => return match error {
+                PatternCreationError::NoShapeSequences => Err(ToError::ShortOrderDimension),
+                PatternCreationError::ContainsInvalidPermutation => panic!("Unreachable assumption"),
+            },
+        };
+
         self.try_bind(&move_rules, &pattern)
             .map(|executor| {
                 executor.execute_single()
             })
             .map_err(|error| {
-                use PcPossibleExecutorBulkCreationError as From;
-                use PcPossibleExecutorCreationError as To;
                 match error {
-                    From::UnexpectedBoardSpaces => To::UnexpectedBoardSpaces,
-                    From::ShortPatternDimension | From::PatternIsEmpty => To::ShortOrderDimension,
-                    From::BoardIsTooHigh => To::BoardIsTooHigh,
+                    FromError::UnexpectedBoardSpaces => ToError::UnexpectedBoardSpaces,
+                    FromError::ShortPatternDimension => ToError::ShortOrderDimension,
+                    FromError::BoardIsTooHigh => ToError::BoardIsTooHigh,
                 }
             })
     }

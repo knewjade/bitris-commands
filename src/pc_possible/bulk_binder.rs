@@ -38,9 +38,9 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
             rotation_system,
             allow_move: AllowMove::Softdrop,
             clipped_board: ClippedBoard::try_new(Board64::blank(), 4).unwrap(),
-            pattern: Rc::from(Pattern::new(vec![
+            pattern: Rc::from(Pattern::try_from(vec![
                 PatternElement::Factorial(ShapeCounter::one_of_each()),
-            ])),
+            ]).unwrap()),
             allows_hold: true,
         }
     }
@@ -104,9 +104,9 @@ mod tests {
             ###.....##
         ").unwrap();
         binder.clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-        binder.pattern = Rc::from(Pattern::new(vec![
+        binder.pattern = Rc::from(Pattern::try_from(vec![
             Permutation(ShapeCounter::one_of_each(), 6),
-        ]));
+        ]).unwrap());
         let result = binder.try_execute().unwrap();
         assert_eq!(result.count_succeed(), 4088);
     }

@@ -1,6 +1,6 @@
 use bitris::Shape;
-use derive_more::Constructor;
 use itertools::{Itertools, repeat_n};
+use thiserror::Error;
 
 use crate::{ForEachVisitor, ShapeCounter, ShapeOrder, ShapeSequence};
 use crate::bit_shapes::BitShapes;
@@ -90,21 +90,59 @@ impl PatternElement {
 /// use bitris_commands::prelude::*;
 /// use PatternElement::*;
 ///
-/// let pattern = Pattern::new(vec![One(Shape::T), Wildcard, Wildcard]);
+/// // `T**` (e.g. TTT, TTI, TTO, ..., TZZ: 49 sequences)
+/// let pattern = Pattern::try_from(vec![One(Shape::T), Wildcard, Wildcard]).unwrap();
 /// assert_eq!(pattern.len_shapes_vec(), 49);
 /// assert_eq!(pattern.dim_shapes(), 3);
 ///
-/// let pattern = Pattern::new(vec![Fixed(BitShapes::try_from(vec![Shape::T, Shape::I]).unwrap())]);
+/// // `TI` (1 sequence)
+/// let pattern = Pattern::try_from(vec![Fixed(BitShapes::try_from(vec![Shape::T, Shape::I]).unwrap())]).unwrap();
 /// assert_eq!(pattern.len_shapes_vec(), 1);
 /// assert_eq!(pattern.dim_shapes(), 2);
 ///
-/// let pattern = Pattern::new(vec![Permutation(ShapeCounter::one_of_each(), 3)]);
+/// // `[TIOLJSZ]p3` (e.g. TIO, TIL, ..., TOI, ..., TZS: 210 sequences)
+/// let pattern = Pattern::try_from(vec![Permutation(ShapeCounter::one_of_each(), 3)]).unwrap();
 /// assert_eq!(pattern.len_shapes_vec(), 210);
 /// assert_eq!(pattern.dim_shapes(), 3);
 /// ```
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default, Constructor)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Pattern {
     elements: Vec<PatternElement>,
+}
+
+/// A collection of errors that occur when making the pattern.
+#[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum PatternCreationError {
+    #[error("This does not have shape sequences.")]
+    NoShapeSequences,
+    #[error("The elements contains invalid permutation.")]
+    ContainsInvalidPermutation,
+}
+
+impl TryFrom<Vec<PatternElement>> for Pattern {
+    type Error = PatternCreationError;
+
+    fn try_from(elements: Vec<PatternElement>) -> Result<Self, Self::Error> {
+        use PatternElement::*;
+        use PatternCreationError::*;
+
+        if elements.is_empty() {
+            return Err(NoShapeSequences);
+        }
+
+        for element in &elements {
+            match element {
+                Permutation(counter, pop) => {
+                    if counter.len() <= 0 || *pop <= 0 || counter.len() < *pop {
+                        return Err(ContainsInvalidPermutation);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Self { elements })
+    }
 }
 
 impl Pattern {
@@ -205,7 +243,7 @@ impl Pattern {
 mod tests {
     use bitris::Shape;
 
-    use crate::{Pattern, PatternElement, ShapeCounter};
+    use crate::{Pattern, PatternCreationError, PatternElement, ShapeCounter};
     use crate::bit_shapes::BitShapes;
 
     #[test]
@@ -259,24 +297,36 @@ mod tests {
 
     #[test]
     fn empty() {
-        let pattern = Pattern::new(vec![]);
-        assert_eq!(pattern.len_shapes_vec(), 0);
-        assert_eq!(pattern.to_sequences().len(), 0);
+        assert_eq!(Pattern::try_from(vec![]).unwrap_err(), PatternCreationError::NoShapeSequences);
     }
 
     #[test]
-    #[should_panic]
-    fn empty_dim() {
-        let pattern = Pattern::new(vec![]);
-        pattern.dim_shapes();
+    fn contains_invalid_permutation() {
+        use PatternElement::*;
+        assert_eq!(
+            Pattern::try_from(vec![Permutation(ShapeCounter::one_of_each(), 8)]).unwrap_err(),
+            PatternCreationError::ContainsInvalidPermutation,
+        );
+        assert_eq!(
+            Pattern::try_from(vec![Permutation(ShapeCounter::one_of_each(), 0)]).unwrap_err(),
+            PatternCreationError::ContainsInvalidPermutation,
+        );
+        assert_eq!(
+            Pattern::try_from(vec![Permutation(ShapeCounter::empty(), 0)]).unwrap_err(),
+            PatternCreationError::ContainsInvalidPermutation,
+        );
+        assert_eq!(
+            Pattern::try_from(vec![Permutation(ShapeCounter::empty(), 1)]).unwrap_err(),
+            PatternCreationError::ContainsInvalidPermutation,
+        );
     }
 
     #[test]
-    fn test() {
-        let patterns = Pattern::new(vec![
+    fn large() {
+        let patterns = Pattern::try_from(vec![
             PatternElement::Permutation(ShapeCounter::one_of_each(), 6),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 3),
-        ]);
+        ]).unwrap();
         assert_eq!(patterns.len_shapes_vec(), 5040 * 210);
         assert_eq!(patterns.dim_shapes(), 9);
         assert_eq!(patterns.to_sequences().len(), 5040 * 210);

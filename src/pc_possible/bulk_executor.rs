@@ -72,8 +72,6 @@ pub enum PcPossibleExecutorBulkCreationError {
     UnexpectedBoardSpaces,
     #[error("The pattern is too short to take a PC.")]
     ShortPatternDimension,
-    #[error("The pattern does not have shape sequences.")]
-    PatternIsEmpty,
     #[error("Board height exceeds the upper limit. Up to 56 are supported.")]
     BoardIsTooHigh,
 }
@@ -114,20 +112,20 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     ///     XXX....XXX
     ///     XXX...XXXX
     ///     XXX....XXX
-    /// ").expect("Failed to create a board.");
+    /// ").expect("Failed to create a board");
     /// let height = 4;
-    /// let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
+    /// let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
     ///
     /// // Defines available shape sequences. Below represents 840 sequences to take out four from all shapes.
-    /// let pattern = Pattern::new(vec![
+    /// let pattern = Pattern::try_from(vec![
     ///     PatternElement::One(Shape::I),
     ///     PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
-    /// ]);
+    /// ]).expect("Failed to create a pattern");
     ///
     /// let allows_hold = true;
     ///
     /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
-    ///     .expect("Failed to create an executor.");
+    ///     .expect("Failed to create an executor");
     ///
     /// let results = executor.execute();
     /// assert_eq!(results.count_succeed(), 711);
@@ -148,10 +146,6 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 
         if clipped_board.spaces() % 4 != 0 {
             return Err(UnexpectedBoardSpaces);
-        }
-
-        if pattern.len_shapes_vec() == 0 {
-            return Err(PatternIsEmpty);
         }
 
         let dimension = pattern.dim_shapes() as u32;
@@ -189,18 +183,18 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     ///     .....#####
     ///     ..#..#####
     ///     .#....####
-    /// ").expect("Failed to create a board.");
+    /// ").expect("Failed to create a board");
     /// let height = 4;
-    /// let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip.");
+    /// let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
     ///
-    /// let pattern = Pattern::new(vec![
+    /// let pattern = Pattern::try_from(vec![
     ///     PatternElement::Permutation(ShapeCounter::one_of_each(), 5),
-    /// ]);
+    /// ]).expect("Failed to create a pattern");
     ///
     /// let allows_hold = false;
     ///
     /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
-    ///     .expect("Failed to create an executor.");
+    ///     .expect("Failed to create an executor");
     ///
     /// // Stops after 10 failures.
     /// let result = executor.execute_with_early_stopping(|results| {
@@ -387,9 +381,9 @@ mod tests {
             #####..###
         ").unwrap();
         let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-        let pattern = Pattern::new(vec![
+        let pattern = Pattern::try_from(vec![
             Permutation(ShapeCounter::one_of_each(), 3),
-        ]);
+        ]).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         let executor = PcPossibleBulkExecutor::try_new(
@@ -420,18 +414,18 @@ mod tests {
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         {
-            let single_pattern = Pattern::new(vec![
+            let single_pattern = Pattern::try_from(vec![
                 Fixed(BitShapes::try_from(vec![J, O, I]).unwrap()),
-            ]);
+            ]).unwrap();
             let executor = PcPossibleBulkExecutor::try_new(
                 &move_rules, clipped_board, &single_pattern, true,
             ).unwrap();
             assert!(executor.execute_single());
         }
         {
-            let single_pattern = Pattern::new(vec![
+            let single_pattern = Pattern::try_from(vec![
                 Fixed(BitShapes::try_from(vec![J, T, I]).unwrap()),
-            ]);
+            ]).unwrap();
             let executor = PcPossibleBulkExecutor::try_new(
                 &move_rules, clipped_board, &single_pattern, true,
             ).unwrap();
@@ -447,10 +441,10 @@ mod tests {
             ######..##
         ").unwrap();
         let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
-        let pattern = Pattern::new(vec![
+        let pattern = Pattern::try_from(vec![
             One(Shape::O),
             One(Shape::O),
-        ]);
+        ]).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
             PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
@@ -466,28 +460,13 @@ mod tests {
             ######....
         ").unwrap();
         let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
-        let pattern = Pattern::new(vec![
+        let pattern = Pattern::try_from(vec![
             One(Shape::O),
-        ]);
+        ]).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
             PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
             PcPossibleExecutorBulkCreationError::ShortPatternDimension,
-        );
-    }
-
-    #[test]
-    fn error_pattern_is_empty() {
-        let board = Board64::from_str("
-            ######....
-            ######....
-        ").unwrap();
-        let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
-        let pattern = Pattern::default();
-        let move_rules = MoveRules::srs(AllowMove::Softdrop);
-        assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
-            PcPossibleExecutorBulkCreationError::PatternIsEmpty,
         );
     }
 
@@ -502,9 +481,9 @@ mod tests {
         }
 
         let clipped_board = ClippedBoard::try_new(board, height).unwrap();
-        let pattern = Pattern::new(vec![
+        let pattern = Pattern::try_from(vec![
             PatternElement::One(Shape::I),
-        ].repeat((height / 4) as usize));
+        ].repeat((height / 4) as usize)).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         let executor = PcPossibleBulkExecutor::try_new(
@@ -528,9 +507,9 @@ mod tests {
         }
 
         let clipped_board = ClippedBoard::try_new(board, height).unwrap();
-        let pattern = Pattern::new(vec![
+        let pattern = Pattern::try_from(vec![
             PatternElement::One(Shape::I),
-        ].repeat((height / 4) as usize + 2));
+        ].repeat((height / 4) as usize + 2)).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
             PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
