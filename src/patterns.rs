@@ -19,13 +19,16 @@ pub enum PatternElement {
     One(Shape),
 
     /// A sequence fixed shapes (like `TIO`)
+    /// If you want to specify a length longer than BitShapes supports, split it into `One` or shorter `Fixed`.
     Fixed(BitShapes),
 
     /// One from all shapes (like. `*`)
     Wildcard,
 
     /// Permutations by taking `usize` shapes from `ShapeCounter`. Duplicates are not removed.
-    /// (like `[TIO]p2`)
+    /// (like `[TIO]p2`, `[JJSZ]p3`)
+    ///
+    /// Panic if usize(the pop size) is larger than the count of shapes(ShapeCounter).
     Permutation(ShapeCounter, usize),
 
     /// Permutations by taking all shapes from `ShapeCounter`. Duplicates are not removed.

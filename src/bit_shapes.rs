@@ -1,5 +1,6 @@
 use bitris::Shape;
 use derive_more::Constructor;
+use thiserror::Error;
 
 use crate::internal_macros::forward_impl_try_from;
 use crate::ShapeSequence;
@@ -59,8 +60,9 @@ impl BitShapes {
 }
 
 /// A collection of errors that occur when making `BitShapes`.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Error, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum BitShapesCreationError {
+    #[error("The shapes are too long. It supports up to 22 shapes.")]
     TooManyShapes(usize),
 }
 
