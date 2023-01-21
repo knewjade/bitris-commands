@@ -37,6 +37,22 @@ impl PcPossibleExecutorBinder<SrsKickTable> {
 }
 
 impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
+    pub fn new(
+        rotation_system: Rc<T>,
+        allow_move: AllowMove,
+        clipped_board: ClippedBoard,
+        shape_order: Rc<ShapeOrder>,
+        allows_hold: bool,
+    ) -> Self {
+        Self {
+            rotation_system,
+            allow_move,
+            clipped_board,
+            shape_order,
+            allows_hold,
+        }
+    }
+
     /// Making the executor with default.
     ///
     /// The default values are as follows:

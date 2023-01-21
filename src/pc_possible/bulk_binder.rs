@@ -24,6 +24,22 @@ impl PcPossibleBulkExecutorBinder<SrsKickTable> {
 }
 
 impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
+    pub fn new(
+        rotation_system: Rc<T>,
+        allow_move: AllowMove,
+        clipped_board: ClippedBoard,
+        pattern: Rc<Pattern>,
+        allows_hold: bool,
+    ) -> Self {
+        Self {
+            rotation_system,
+            allow_move,
+            clipped_board,
+            pattern,
+            allows_hold,
+        }
+    }
+
     /// Making the executor with default.
     ///
     /// The default values are as follows:
