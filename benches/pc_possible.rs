@@ -8,10 +8,10 @@ use bitris_commands::prelude::*;
 
 #[inline(always)]
 fn pc_possible(data: &PcPossibleBenchmarkData) {
-    let move_rules = MoveRules::srs(AllowMove::Softdrop);
+    let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
     let executor = pc_possible::PcPossibleBulkExecutor::try_new(
-        &move_rules, clipped_board, &data.patterns, true,
+        &move_rules, clipped_board, &data.patterns, data.allows_hold,
     ).unwrap();
     let result = executor.execute();
     assert_eq!(result.count_succeed(), data.expected);
@@ -23,6 +23,8 @@ struct PcPossibleBenchmarkData {
     board: Board64,
     height: u32,
     patterns: Rc<Pattern>,
+    allow_move: AllowMove,
+    allows_hold: bool,
     expected: u64,
 }
 
@@ -44,6 +46,8 @@ fn bench_pc_possibles(c: &mut Criterion) {
             patterns: Rc::from(Pattern::try_from(vec![
                 Permutation(ShapeCounter::one_of_each(), 4),
             ]).unwrap()),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
             expected: 514,
         },
         PcPossibleBenchmarkData {
@@ -59,6 +63,8 @@ fn bench_pc_possibles(c: &mut Criterion) {
             patterns: Rc::from(Pattern::try_from(vec![
                 Permutation(ShapeCounter::one_of_each(), 5),
             ]).unwrap()),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
             expected: 1672,
         },
         PcPossibleBenchmarkData {
@@ -74,6 +80,8 @@ fn bench_pc_possibles(c: &mut Criterion) {
             patterns: Rc::from(Pattern::try_from(vec![
                 Factorial(ShapeCounter::one_of_each()),
             ]).unwrap()),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
             expected: 5028,
         },
         PcPossibleBenchmarkData {
@@ -86,6 +94,8 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ]).unwrap()),
                 Wildcard,
             ]).unwrap()),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
             expected: 7,
         },
         PcPossibleBenchmarkData {
@@ -102,6 +112,8 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 One(T),
                 Permutation(ShapeCounter::one_of_each(), 4),
             ]).unwrap()),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
             expected: 744,
         },
         PcPossibleBenchmarkData {
@@ -117,6 +129,8 @@ fn bench_pc_possibles(c: &mut Criterion) {
             patterns: Rc::from(Pattern::try_from(vec![
                 Factorial(ShapeCounter::one_of_each()),
             ]).unwrap()),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
             expected: 4788,
         },
     ];
