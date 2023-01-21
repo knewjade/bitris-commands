@@ -27,3 +27,7 @@ bench = false
 [[bench]]
 name = "pc_possible"
 harness = false
+
+[[bench]]
+name = "all_pcs"
+harness = false

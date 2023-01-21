@@ -2,9 +2,10 @@ use bitris::AllowMove::Softdrop;
 use bitris::prelude::*;
 use fxhash::{FxHashMap, FxHashSet};
 use itertools::Itertools;
+use thiserror::Error;
 
+use crate::{ClippedBoard, Pattern};
 use crate::all_pcs::nodes::{IndexNode, ItemNode, Nodes};
-use crate::ClippedBoard;
 use crate::internals::Array4;
 
 const WIDTH: usize = 10;
@@ -16,7 +17,7 @@ struct Aggregator {
 }
 
 impl Aggregator {
-    fn aggregate(&self) {
+    fn aggregate(&self) -> u64 {
         let predefines: Vec<PiecePredefines3> = self.predefines.iter()
             .map(|(_, p2)| { p2.to_piece_predefines3() })
             .collect();
@@ -37,7 +38,7 @@ impl Aggregator {
 
         let mut filled = [0; 100];
         let mut results = [0; 100];
-        self.aggregate_(&predefines, &using_rows_each_y, 0, 0, &mut filled, &mut results);
+        self.aggregate_(&predefines, &using_rows_each_y, 0, 0, &mut filled, &mut results)
     }
 
     fn aggregate_(
@@ -48,9 +49,11 @@ impl Aggregator {
         depth: usize,
         filled: &mut [u64; 100],
         results: &mut [usize; 100],
-    ) {
+    ) -> u64 {
         match self.nodes.indexes[index_id] {
             IndexNode::Jump(next_item_id, item_length) => {
+                let mut success = 0u64;
+
                 let height = self.clipped_board.height() as usize;
                 let (next_item_id, item_length) = (next_item_id as usize, item_length as usize);
                 for index in next_item_id..(next_item_id + item_length) {
@@ -104,13 +107,15 @@ impl Aggregator {
                                 filled[ni + j] = filled[ci + j] | using_rows_each_y[hi + j].key;
                             }
 
-                            self.aggregate_(predefines, using_rows_each_y, *next_index_id, next_depth, filled, results);
+                            success += self.aggregate_(predefines, using_rows_each_y, *next_index_id, next_depth, filled, results);
                         }
                     }
                 }
+
+                success
             }
             IndexNode::Skip(next_index_id) => {
-                self.aggregate_(predefines, using_rows_each_y, next_index_id as usize, depth, filled, results);
+                self.aggregate_(predefines, using_rows_each_y, next_index_id as usize, depth, filled, results)
             }
             IndexNode::ToHi => {
                 let x = results[0..depth].iter()
@@ -128,12 +133,12 @@ impl Aggregator {
                         (pre, lx, board)
                     })
                     .collect_vec();
-                self.ok(&x);
+                if self.ok(&x) { 1 } else { 0 }
             }
         }
     }
 
-    fn ok(&self, results: &Vec<(&PiecePredefines3, usize, Board64)>) {
+    fn ok(&self, results: &Vec<(&PiecePredefines3, usize, Board64)>) -> bool {
         let mut hash_set = FxHashSet::<u64>::default();
         hash_set.reserve((1u64 << results.len()) as usize);
 
@@ -167,12 +172,7 @@ impl Aggregator {
         //     }
         // }
 
-        let r = self.ok2(results, self.clipped_board.board(), (1u64 << results.len()) - 1, &mut hash_set, &move_rules);
-        if r {
-            println!("OK");
-        } else {
-            // println!("NG");
-        }
+        self.ok2(results, self.clipped_board.board(), (1u64 << results.len()) - 1, &mut hash_set, &move_rules)
     }
 
     fn ok2(&self, results: &Vec<(&PiecePredefines3, usize, Board64)>, board_: Board64, rest: u64, visited: &mut FxHashSet::<u64>, move_rules: &MoveRules<SrsKickTable>) -> bool {
@@ -484,6 +484,69 @@ fn build(clipped_board: ClippedBoard, predefines: &Vec<(usize, PiecePredefines2)
     assert_eq!(nodes.index_serial(), frontiers.len());
 
     nodes
+}
+
+
+/// A collection of errors that occur when making the executor.
+#[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum AllPcsExecutorBulkCreationError {
+    #[error("Unexpected the count of board spaces.")]
+    UnexpectedBoardSpaces,
+    #[error("The pattern is too short to take a PC.")]
+    ShortPatternDimension,
+    #[error("Board height exceeds the upper limit. Up to 20 are supported.")]
+    BoardIsTooHigh,
+}
+
+/// The executor to find PC possibles.
+#[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
+pub struct AllPcsBulkExecutor<'a, T: RotationSystem> {
+    move_rules: &'a MoveRules<'a, T>,
+    clipped_board: ClippedBoard,
+    pattern: &'a Pattern,
+    allows_hold: bool,
+    has_extra_shapes: bool,
+    spawn_position: BlPosition,
+}
+
+impl<'a, T: RotationSystem> AllPcsBulkExecutor<'a, T> {
+    // TODO desc
+    pub fn try_new(
+        move_rules: &'a MoveRules<T>,
+        clipped_board: ClippedBoard,
+        pattern: &'a Pattern,
+        allows_hold: bool,
+    ) -> Result<Self, AllPcsExecutorBulkCreationError> {
+        use AllPcsExecutorBulkCreationError::*;
+
+        if 20 < clipped_board.height() {
+            return Err(BoardIsTooHigh);
+        }
+
+        if clipped_board.spaces() % 4 != 0 {
+            return Err(UnexpectedBoardSpaces);
+        }
+
+        let dimension = pattern.dim_shapes() as u32;
+        if dimension < clipped_board.spaces() / 4 {
+            return Err(ShortPatternDimension);
+        }
+
+        debug_assert!(0 < clipped_board.spaces());
+
+        let has_extra_shapes = clipped_board.spaces() / 4 < dimension;
+
+        // Spawn over the top of the well to avoid getting stuck.
+        let spawn_position = bl(5, clipped_board.height() as i32 + 4);
+
+        Ok(Self { move_rules, clipped_board, pattern, allows_hold, has_extra_shapes, spawn_position })
+    }
+
+    /// TODO desc Start the search for PC possible in bulk.
+    pub fn execute(&self) -> u64 {
+        let aggregator = build2(self.clipped_board);
+        aggregator.aggregate()
+    }
 }
 
 

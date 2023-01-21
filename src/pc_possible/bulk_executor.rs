@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{ClippedBoard, ForEachVisitor, OrderCursor, Pattern, PopOp, ShapeOrder, ShapeSequence};
 use crate::internals::{FuzzyShape, FuzzyShapeOrder};
-use crate::pc_possible::{Buffer, PcResults, VerticalParity};
+use crate::pc_possible::{Buffer, ExecuteInstruction, PcResults, VerticalParity};
 use crate::pc_possible::bulk_executor::ExecuteInstruction::Continue;
 
 struct Visitor<'a> {
@@ -85,13 +85,6 @@ pub struct PcPossibleBulkExecutor<'a, T: RotationSystem> {
     allows_hold: bool,
     has_extra_shapes: bool,
     spawn_position: BlPosition,
-}
-
-/// A collection of statements that instruct execution to continue/stop.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
-pub enum ExecuteInstruction {
-    #[default] Continue,
-    Stop,
 }
 
 impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
