@@ -157,7 +157,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 
         let has_extra_shapes = clipped_board.spaces() / 4 < dimension;
 
-        // Spawn above the height so that it is not stuck when harddrop only.
+        // Spawn over the top of the well to avoid getting stuck.
         let spawn_position = bl(5, clipped_board.height() as i32 + 4);
 
         Ok(Self { move_rules, clipped_board, pattern, allows_hold, has_extra_shapes, spawn_position })
