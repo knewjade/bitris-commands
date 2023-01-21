@@ -24,6 +24,7 @@ pub mod prelude {
 }
 
 pub mod pc_possible;
+pub mod all_pcs;
 
 mod bit_shapes;
 mod clipped_board;
