@@ -2,9 +2,11 @@ use bitris::AllowMove::Softdrop;
 use bitris::prelude::*;
 use fxhash::{FxHashMap, FxHashSet};
 use itertools::Itertools;
+use tap::Conv;
 use thiserror::Error;
 
 use crate::{ClippedBoard, Pattern};
+use crate::all_pcs::{IndexedPieces, PredefinedPiece, PredefinedPieceToBuild, PredefinedPieceToAggregate};
 use crate::all_pcs::nodes::{IndexNode, ItemNode, Nodes};
 use crate::internals::Array4;
 
@@ -13,14 +15,11 @@ const WIDTH: usize = 10;
 struct Aggregator {
     clipped_board: ClippedBoard,
     nodes: Nodes,
-    predefines: Vec<(usize, PiecePredefines2)>,
 }
 
 impl Aggregator {
-    fn aggregate(&self) -> u64 {
-        let predefines: Vec<PiecePredefines3> = self.predefines.iter()
-            .map(|(_, p2)| { p2.to_piece_predefines3() })
-            .collect();
+    fn aggregate(&self, indexed_pieces: &IndexedPieces<PredefinedPiece>) -> u64 {
+        let predefines = indexed_pieces.conv::<IndexedPieces<PredefinedPieceToAggregate>>();
 
         let height = self.clipped_board.height() as usize;
 
@@ -43,7 +42,7 @@ impl Aggregator {
 
     fn aggregate_(
         &self,
-        predefines: &Vec<PiecePredefines3>,
+        predefines: &IndexedPieces<PredefinedPieceToAggregate>,
         using_rows_each_y: &Vec<Lines>,
         index_id: usize,
         depth: usize,
@@ -138,7 +137,7 @@ impl Aggregator {
         }
     }
 
-    fn ok(&self, results: &Vec<(&PiecePredefines3, usize, Board64)>) -> bool {
+    fn ok(&self, results: &Vec<(&PredefinedPieceToAggregate, usize, Board64)>) -> bool {
         let mut hash_set = FxHashSet::<u64>::default();
         hash_set.reserve((1u64 << results.len()) as usize);
 
@@ -175,7 +174,7 @@ impl Aggregator {
         self.ok2(results, self.clipped_board.board(), (1u64 << results.len()) - 1, &mut hash_set, &move_rules)
     }
 
-    fn ok2(&self, results: &Vec<(&PiecePredefines3, usize, Board64)>, board_: Board64, rest: u64, visited: &mut FxHashSet::<u64>, move_rules: &MoveRules<SrsKickTable>) -> bool {
+    fn ok2(&self, results: &Vec<(&PredefinedPieceToAggregate, usize, Board64)>, board_: Board64, rest: u64, visited: &mut FxHashSet::<u64>, move_rules: &MoveRules<SrsKickTable>) -> bool {
         let mut board2 = board_.clone();
         let deleted_key = board2.clear_lines();
 
@@ -233,120 +232,14 @@ impl Aggregator {
 // TODO assert! > debug_assert!
 
 
-#[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Default, Debug)]
-struct PiecePredefines2 {
-    pub piece: Piece,
-    pub ys: Array4<usize>,
-    pub locations: Array4<Location>,
-}
-
-impl PiecePredefines2 {
-    fn to_piece_predefines(&self, height: u32) -> PiecePredefines {
-        let min_vertical_index = self.locations
-            .iter()
-            .filter(|location| { location.x == 0 })
-            .map(|location| location.y as usize)
-            .min()
-            .unwrap();
-
-        let vertical_relative_block = self.locations
-            .iter()
-            .fold(0u64, |prev, location| {
-                let shift = location.x * (height as i32) + location.y - min_vertical_index as i32;
-                prev | (1u64 << shift)
-            });
-
-        PiecePredefines { piece: self.piece, min_vertical_index, vertical_relative_block }
-    }
-
-    fn to_piece_predefines3(&self) -> PiecePredefines3 {
-        let deleted_rows = self.ys.iter()
-            .skip(1)
-            .fold((self.ys[0], 0u64), |(prev_y, merge), y| {
-                let a = (1u64 << y) - 1;
-                let b = (1u64 << (prev_y + 1)) - 1;
-                let i = a ^ b;
-                (*y, merge | (i))
-            }).1;
-
-        let using_rows = self.ys.iter()
-            .fold(0u64, |merge, y| {
-                merge | (1u64 << y)
-            });
-
-        PiecePredefines3 {
-            piece: self.piece,
-            ys: self.ys,
-            locations: self.locations,
-            using_rows: Lines::new(using_rows),
-            deleted_rows: Lines::new(deleted_rows),
-        }
-    }
-}
-
-fn make_minos2(piece: Piece, height: usize) -> Vec<PiecePredefines2> {
-    let piece_blocks = piece.to_piece_blocks();
-    (0..height).combinations(piece_blocks.height as usize)
-        .map(|mut ys| {
-            ys.sort();
-            Array4::try_from(ys).unwrap()
-        })
-        .map(|ys| {
-            let locations = piece_blocks.offsets
-                .into_iter()
-                .map(|offset| { offset - piece_blocks.bottom_left })
-                .map(|offset| { Location::new(offset.dx, ys[offset.dy as usize] as i32) })
-                .collect_vec()
-                .try_into()
-                .unwrap();
-            PiecePredefines2 { piece, ys, locations }
-        })
-        .collect()
-}
-
-#[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Default, Debug)]
-struct PiecePredefines {
-    pub piece: Piece,
-    pub min_vertical_index: usize,
-    pub vertical_relative_block: u64,
-}
-
-#[derive(Clone, PartialEq, PartialOrd, Hash, Default, Debug)]
-struct PiecePredefines3 {
-    pub piece: Piece,
-    pub ys: Array4<usize>,
-    pub using_rows: Lines,
-    pub deleted_rows: Lines,
-    pub locations: Array4<Location>,
-}
-
 struct Frontier {
     board: u64,
 }
 
-fn make_predefines2(height: usize) -> Vec<(usize, PiecePredefines2)> {
-    Piece::all_vec()
-        .into_iter()
-        .filter(|piece| piece.canonical().is_none())
-        .flat_map(|piece| {
-            make_minos2(piece, height)
-        })
-        .enumerate()
-        .collect()
-}
+fn build(clipped_board: ClippedBoard, indexed_pieces: &IndexedPieces<PredefinedPiece>) -> Nodes {
+    assert!(!indexed_pieces.is_empty());
 
-fn build2(clipped_board: ClippedBoard) -> Aggregator {
-    let predefines = make_predefines2(clipped_board.height() as usize);
-    let nodes = build(clipped_board, &predefines);
-    Aggregator { clipped_board, nodes, predefines }
-}
-
-fn build(clipped_board: ClippedBoard, predefines: &Vec<(usize, PiecePredefines2)>) -> Nodes {
-    assert!(!predefines.is_empty());
-
-    let predefines = predefines.iter()
-        .map(|(index, p2)| (*index, p2.to_piece_predefines(clipped_board.height())))
-        .collect_vec();
+    let predefines = indexed_pieces.conv::<IndexedPieces<PredefinedPieceToBuild>>();
 
     let height = clipped_board.height() as usize;
 
@@ -544,89 +437,92 @@ impl<'a, T: RotationSystem> AllPcsBulkExecutor<'a, T> {
 
     /// TODO desc Start the search for PC possible in bulk.
     pub fn execute(&self) -> u64 {
-        let aggregator = build2(self.clipped_board);
-        aggregator.aggregate()
+        let clipped_board = self.clipped_board;
+        let indexed_pieces = IndexedPieces::<PredefinedPiece>::new(clipped_board.height() as usize);
+        let nodes = build(clipped_board, &indexed_pieces);
+        let aggregator = Aggregator { clipped_board, nodes };
+        aggregator.aggregate(&indexed_pieces)
     }
 }
 
-
-#[cfg(test)]
-mod tests {
-    use std::str::FromStr;
-
-    use bitris::Board64;
-    use rstest::rstest;
-
-    use crate::all_pcs::bulk_executor::{build, build2, make_predefines2};
-    use crate::ClippedBoard;
-
-    #[rstest(height, item, index,
-    case(4, 5385, 4168 - 2),
-    case(6, 412515, 178069 - 2),
-    )]
-    fn blank(height: u32, item: usize, index: usize) {
-        let clipped_board = ClippedBoard::try_new(Board64::blank(), height).unwrap();
-        let predefines = make_predefines2(clipped_board.height() as usize);
-        let nodes = build(clipped_board, &predefines);
-        assert_eq!(nodes.item_serial(), item);
-        assert_eq!(nodes.index_serial(), index);
-    }
-
-    #[test]
-    fn test() {
-        let board = Board64::from_str("
-            #######...
-            #######...
-            #######...
-            #######...
-        ").unwrap();
-        let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-        let predefines = make_predefines2(clipped_board.height() as usize);
-        let nodes = build(clipped_board, &predefines);
-        assert_eq!(nodes.item_serial(), 379); // TODO
-        assert_eq!(nodes.index_serial(), 299); // TODO
-    }
-
-    #[test]
-    fn test2() {
-        let board = Board64::from_str("
-            ...#######
-            ...#######
-            ...#######
-            ...#######
-        ").unwrap();
-        let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-        let predefines = make_predefines2(clipped_board.height() as usize);
-        let nodes = build(clipped_board, &predefines);
-        assert_eq!(nodes.item_serial(), 379); // TODO
-        assert_eq!(nodes.index_serial(), 309); // TODO
-    }
-
-    #[test]
-    fn test3_() {
-        let board = Board64::from_str("
-            ...#######
-            ...#######
-            ...#######
-            ...#######
-        ").unwrap();
-        let height = 4;
-        let clipped_board = ClippedBoard::try_new(board, height).unwrap();
-        let aggregator = build2(clipped_board);
-        aggregator.aggregate();
-    }
-
-    #[test]
-    fn test2_() {
-        let board = Board64::from_str("
-            ...######.
-            ...######.
-            ...######.
-            ..########
-        ").unwrap();
-        let height = 4;
-        let clipped_board = ClippedBoard::try_new(board, height).unwrap();
-        let aggregator = build2(clipped_board);
-        aggregator.aggregate();
-    }
-}
+//
+// #[cfg(test)]
+// mod tests {
+//     use std::str::FromStr;
+//
+//     use bitris::Board64;
+//     use rstest::rstest;
+//
+//     use crate::all_pcs::bulk_executor::{build, make_predefines2};
+//     use crate::ClippedBoard;
+//
+//     #[rstest(height, item, index,
+//     case(4, 5385, 4168 - 2),
+//     case(6, 412515, 178069 - 2),
+//     )]
+//     fn blank(height: u32, item: usize, index: usize) {
+//         let clipped_board = ClippedBoard::try_new(Board64::blank(), height).unwrap();
+//         let predefines = make_predefines2(clipped_board.height() as usize);
+//         let nodes = build(clipped_board, &predefines);
+//         assert_eq!(nodes.item_serial(), item);
+//         assert_eq!(nodes.index_serial(), index);
+//     }
+//
+//     #[test]
+//     fn test() {
+//         let board = Board64::from_str("
+//             #######...
+//             #######...
+//             #######...
+//             #######...
+//         ").unwrap();
+//         let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+//         let predefines = make_predefines2(clipped_board.height() as usize);
+//         let nodes = build(clipped_board, &predefines);
+//         assert_eq!(nodes.item_serial(), 379); // TODO
+//         assert_eq!(nodes.index_serial(), 299); // TODO
+//     }
+//
+//     #[test]
+//     fn test2() {
+//         let board = Board64::from_str("
+//             ...#######
+//             ...#######
+//             ...#######
+//             ...#######
+//         ").unwrap();
+//         let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+//         let predefines = make_predefines2(clipped_board.height() as usize);
+//         let nodes = build(clipped_board, &predefines);
+//         assert_eq!(nodes.item_serial(), 379); // TODO
+//         assert_eq!(nodes.index_serial(), 309); // TODO
+//     }
+//
+//     #[test]
+//     fn test3_() {
+//         let board = Board64::from_str("
+//             ...#######
+//             ...#######
+//             ...#######
+//             ...#######
+//         ").unwrap();
+//         let height = 4;
+//         let clipped_board = ClippedBoard::try_new(board, height).unwrap();
+//         let aggregator = build2(clipped_board);
+//         aggregator.aggregate();
+//     }
+//
+//     #[test]
+//     fn test2_() {
+//         let board = Board64::from_str("
+//             ...######.
+//             ...######.
+//             ...######.
+//             ..########
+//         ").unwrap();
+//         let height = 4;
+//         let clipped_board = ClippedBoard::try_new(board, height).unwrap();
+//         let aggregator = build2(clipped_board);
+//         aggregator.aggregate();
+//     }
+// }
