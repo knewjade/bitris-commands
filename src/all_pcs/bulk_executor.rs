@@ -2,7 +2,7 @@ use bitris::prelude::*;
 use thiserror::Error;
 
 use crate::{ClippedBoard, Pattern};
-use crate::all_pcs::{IndexedPieces, PredefinedPiece, Builder};
+use crate::all_pcs::{Builder, IndexedPieces, PredefinedPiece};
 
 // TODO SequenceやOrderをcollect()したい
 // TODO FromIteratorをじっそうする？

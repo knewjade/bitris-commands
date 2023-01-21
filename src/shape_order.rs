@@ -20,8 +20,11 @@ pub struct OrderCursor<'a> {
 impl<'a> OrderCursor<'a> {
     #[inline]
     fn new(sequence: &'a ShapeOrder) -> Self {
-        assert!(0 < sequence.shapes.len());
-        Self { sequence, head: Some(0), tails: 1 }
+        if 0 < sequence.shapes.len() {
+            Self { sequence, head: Some(0), tails: 1 }
+        } else {
+            Self { sequence, head: None, tails: 0 }
+        }
     }
 
     /// Returns `true` if a pop-able shape exists next.
@@ -161,10 +164,24 @@ mod tests {
     use crate::{PopOp, ShapeOrder};
 
     #[test]
-    #[should_panic]
     fn empty() {
         let sequence = ShapeOrder::new(vec![]);
-        sequence.new_cursor();
+        let cursor = sequence.new_cursor();
+
+        // []()
+        assert!(!cursor.has_next());
+        assert_eq!(cursor.len_unused(), 0);
+        assert_eq!(cursor.unused_shapes().shapes(), vec![]);
+        assert_eq!(cursor.first(), None);
+        assert_eq!(cursor.second(), None);
+
+        let (shape, cursor) = cursor.pop(PopOp::First);
+        assert!(!cursor.has_next());
+        assert_eq!(shape, None);
+
+        let (shape, cursor) = cursor.pop(PopOp::Second);
+        assert!(!cursor.has_next());
+        assert_eq!(shape, None);
     }
 
     #[test]
