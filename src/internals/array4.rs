@@ -3,13 +3,15 @@ use std::slice::Iter;
 
 use thiserror::Error;
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
-pub(crate) struct Array4<T> {
-    items: [T; 4],
+pub(crate) type DynArray4<T> = DynArrayN<T, 4>;
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub(crate) struct DynArrayN<T, const N: usize> {
+    items: [T; N],
     len: u8,
 }
 
-impl<T: Copy> Array4<T> {
+impl<T: Copy> DynArrayN<T, 4> {
     #[inline]
     #[cfg(test)]
     fn one(e1: T) -> Self {
@@ -27,15 +29,15 @@ impl<T: Copy> Array4<T> {
     fn three(e1: T, e2: T, e3: T) -> Self {
         Self { items: [e1, e2, e3, e3], len: 3 }
     }
-}
 
-impl<T> Array4<T> {
     #[inline]
     #[cfg(test)]
     fn four(e1: T, e2: T, e3: T, e4: T) -> Self {
         Self { items: [e1, e2, e3, e4], len: 4 }
     }
+}
 
+impl<T, const N: usize> DynArrayN<T, N> {
     #[inline]
     fn get(&self, index: usize) -> Option<&T> {
         if index < self.len() {
@@ -64,33 +66,31 @@ impl<T> Array4<T> {
 
 // A collection of errors that occur when making Array4.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub(crate) enum Array4CreationError {
-    #[error("The length is greater than 4.")]
+pub(crate) enum ArrayNCreationError {
+    #[error("The length is greater than N.")]
     CapacityOver,
 }
 
-impl<T: Copy + Default> TryFrom<Vec<T>> for Array4<T> {
-    type Error = Array4CreationError;
+impl<T: Default + Copy, const N: usize> TryFrom<Vec<T>> for DynArrayN<T, N> {
+    type Error = ArrayNCreationError;
 
     fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
-        use Array4CreationError::*;
+        use ArrayNCreationError::*;
 
         let len = value.len();
-        if 4 < len {
+        if N < len {
             return Err(CapacityOver);
         }
 
-        let items: [T; 4] = [
-            *value.get(0).unwrap_or(&T::default()),
-            *value.get(1).unwrap_or(&T::default()),
-            *value.get(2).unwrap_or(&T::default()),
-            *value.get(3).unwrap_or(&T::default()),
-        ];
+        let mut items: [T; N] = [T::default(); N];
+        for index in 0..len {
+            items[index] = value[index];
+        }
         Ok(Self { items, len: len as u8 })
     }
 }
 
-impl<T> Index<usize> for Array4<T> {
+impl<T, const N: usize> Index<usize> for DynArrayN<T, N> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -102,22 +102,22 @@ impl<T> Index<usize> for Array4<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::internals::{Array4, Array4CreationError};
+    use crate::internals::{DynArray4, ArrayNCreationError};
 
     #[test]
     fn try_from() {
-        use Array4CreationError::*;
-        assert_eq!(Array4::try_from(vec![1]).unwrap().as_slice(), &[1]);
-        assert_eq!(Array4::try_from(vec![1, 2]).unwrap().as_slice(), &[1, 2]);
-        assert_eq!(Array4::try_from(vec![1, 2, 3]).unwrap().as_slice(), &[1, 2, 3]);
-        assert_eq!(Array4::try_from(vec![1, 2, 3, 4]).unwrap().as_slice(), &[1, 2, 3, 4]);
+        use ArrayNCreationError::*;
+        assert_eq!(DynArray4::try_from(vec![1]).unwrap().as_slice(), &[1]);
+        assert_eq!(DynArray4::try_from(vec![1, 2]).unwrap().as_slice(), &[1, 2]);
+        assert_eq!(DynArray4::try_from(vec![1, 2, 3]).unwrap().as_slice(), &[1, 2, 3]);
+        assert_eq!(DynArray4::try_from(vec![1, 2, 3, 4]).unwrap().as_slice(), &[1, 2, 3, 4]);
 
-        assert_eq!(Array4::try_from(vec![1, 2, 3, 4, 5]).unwrap_err(), CapacityOver);
+        assert_eq!(DynArray4::try_from(vec![1, 2, 3, 4, 5]).unwrap_err(), CapacityOver);
     }
 
     #[test]
     fn one() {
-        let array = Array4::one(1);
+        let array = DynArray4::one(1);
         assert_eq!(array.len(), 1);
         assert_eq!(array.as_slice(), &[1]);
         assert_eq!(array[0], 1);
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn two() {
-        let array = Array4::two(1, 2);
+        let array = DynArray4::two(1, 2);
         assert_eq!(array.len(), 2);
         assert_eq!(array.as_slice(), &[1, 2]);
         assert_eq!(array[0], 1);
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn three() {
-        let array = Array4::three(1, 2, 3);
+        let array = DynArray4::three(1, 2, 3);
         assert_eq!(array.len(), 3);
         assert_eq!(array.as_slice(), &[1, 2, 3]);
         assert_eq!(array[0], 1);
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn four() {
-        let array = Array4::four(1, 2, 3, 4);
+        let array = DynArray4::four(1, 2, 3, 4);
         assert_eq!(array.len(), 4);
         assert_eq!(array.as_slice(), &[1, 2, 3, 4]);
         assert_eq!(array[0], 1);
@@ -163,7 +163,7 @@ mod tests {
 
     #[test]
     fn iter() {
-        let array = Array4::three(1, 2, 3);
+        let array = DynArray4::three(1, 2, 3);
         let mut iter = array.iter();
         assert_eq!(iter.next(), Some(&1));
         assert_eq!(iter.next(), Some(&2));

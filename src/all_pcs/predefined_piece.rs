@@ -3,7 +3,7 @@ use std::slice::Iter;
 use bitris::prelude::*;
 use itertools::Itertools;
 
-use crate::internals::Array4;
+use crate::internals::DynArray4;
 
 #[derive(Clone, PartialEq, PartialOrd, Hash, Default, Debug)]
 pub(crate) struct IndexedPieces<T> {
@@ -34,11 +34,11 @@ impl<T> Index<usize> for IndexedPieces<T> {
 }
 
 
-#[derive(Clone, PartialEq, PartialOrd, Hash, Default, Debug)]
+#[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub(crate) struct PredefinedPiece {
     pub piece: Piece,
-    pub ys: Array4<usize>,
-    pub locations: Array4<Location>,
+    pub ys: DynArray4<usize>,
+    pub locations: DynArray4<Location>,
 }
 
 #[derive(Clone, PartialEq, PartialOrd, Hash, Default, Debug)]
@@ -48,13 +48,13 @@ pub(crate) struct PredefinedPieceToBuild {
     pub vertical_relative_block: u64,
 }
 
-#[derive(PartialEq, PartialOrd, Hash, Default, Debug)]
+#[derive(PartialEq, PartialOrd, Hash, Debug)]
 pub(crate) struct PredefinedPieceToAggregate {
     pub piece: Piece,
-    pub ys: Array4<usize>,
+    pub ys: DynArray4<usize>,
     pub using_rows: Lines,
     pub deleted_rows: Lines,
-    pub locations: Array4<Location>,
+    pub locations: DynArray4<Location>,
 }
 
 impl IndexedPieces<PredefinedPiece> {
@@ -64,7 +64,7 @@ impl IndexedPieces<PredefinedPiece> {
             (0..height).combinations(piece_blocks.height as usize)
                 .map(|mut ys| {
                     ys.sort();
-                    Array4::try_from(ys).unwrap()
+                    DynArray4::try_from(ys).unwrap()
                 })
                 .map(|ys| {
                     let locations = piece_blocks.offsets
