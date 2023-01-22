@@ -53,10 +53,10 @@ impl<T> Array4<T> {
 }
 
 
-// TODO A collection of errors that occur when making clipped board.
+// A collection of errors that occur when making Array4.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub(crate) enum Array4CreationError {
-    #[error("TODO")]
+    #[error("The length is greater than 4.")]
     CapacityOver,
 }
 

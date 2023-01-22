@@ -3,7 +3,7 @@ use fxhash::FxHashSet;
 use itertools::Itertools;
 
 use crate::{ClippedBoard, ShapeCounter};
-use crate::all_pcs::{IndexedPieces, IndexNode, ItemNode, Nodes, PredefinedPiece, PredefinedPieceToAggregate};
+use crate::all_pcs::{IndexedPieces, IndexNode, Nodes, PredefinedPiece, PredefinedPieceToAggregate};
 
 pub(crate) struct Aggregator {
     clipped_board: ClippedBoard,
@@ -82,14 +82,14 @@ impl Aggregator {
         solution_validator: &impl Fn(Vec<Shape>) -> bool,
     ) -> u64 {
         match self.nodes.indexes[index_id] {
-            IndexNode::Jump(next_item_id, item_length) => {
+            IndexNode::ToItem(next_item_id, item_length) => {
                 let mut success = 0u64;
 
                 let height = self.clipped_board.height() as usize;
                 let (next_item_id, item_length) = (next_item_id as usize, item_length as usize);
                 for index in next_item_id..(next_item_id + item_length) {
                     let item = &self.nodes.items[index];
-                    let mino_index_and_lx = item.mino_index() as usize;
+                    let mino_index_and_lx = item.predefine_index as usize;
                     let mino_index = mino_index_and_lx / self.width;
                     let predefine = &self.indexed_pieces[mino_index];
 
@@ -105,62 +105,28 @@ impl Aggregator {
 
                     results[depth] = mino_index_and_lx;
 
-                    match item {
-                        ItemNode::ToHi(_) => {
-                            let shapes = results[0..depth].iter()
-                                .map(|&it| {
-                                    let mino_index = it / self.width;
-                                    let pre = &self.indexed_pieces[mino_index];
-                                    pre.piece.shape
-                                })
-                                .collect_vec();
-                            let s = if solution_validator(shapes) {
-                                let x = results[0..depth].iter()
-                                    .map(|&it| {
-                                        let mino_index = it / self.width;
-                                        let lx = it % self.width;
-                                        let pre = &self.indexed_pieces[mino_index];
-                                        let offset = Offset::new(lx as i32, 0);
-                                        let board = pre.locations.iter()
-                                            .map(|location| { location + offset })
-                                            .fold(Board64::blank(), |mut merge, location| {
-                                                merge.set_at(location);
-                                                merge
-                                            });
-                                        (pre, lx, board)
-                                    })
-                                    .collect_vec();
-                                self.ok(&x)
-                            } else {
-                                false
-                            };
-                            success += if s { 1 } else { 0 }
-                        }
-                        ItemNode::ToIndex(_, next_index_id) => {
-                            let next_depth = depth + 1;
+                    let next_depth = depth + 1;
 
-                            let ni = next_depth * height;
-                            let ci = depth * height;
-                            let hi = mino_index * height;
+                    let ni = next_depth * height;
+                    let ci = depth * height;
+                    let hi = mino_index * height;
 
-                            // 揃えられないラインを更新
-                            // temp = [y]ラインにブロックがあると、使用できないライン一覧が記録されている
-                            // ミノXの[y]がdeletedKeyに指定されていると、Xのブロックのあるラインは先に揃えられなくなる
-                            for j in 0..height {
-                                filled[ni + j] = filled[ci + j] | self.using_rows_each_y[hi + j].key;
-                            }
-
-                            success += self.aggregate_(*next_index_id, next_depth, filled, results, solution_validator);
-                        }
+                    // 揃えられないラインを更新
+                    // temp = [y]ラインにブロックがあると、使用できないライン一覧が記録されている
+                    // ミノXの[y]がdeletedKeyに指定されていると、Xのブロックのあるラインは先に揃えられなくなる
+                    for j in 0..height {
+                        filled[ni + j] = filled[ci + j] | self.using_rows_each_y[hi + j].key;
                     }
+
+                    success += self.aggregate_(item.next_index_id, next_depth, filled, results, solution_validator);
                 }
 
                 success
             }
-            IndexNode::Skip(next_index_id) => {
+            IndexNode::ToNextIndex(next_index_id) => {
                 self.aggregate_(next_index_id as usize, depth, filled, results, solution_validator)
             }
-            IndexNode::ToHi => {
+            IndexNode::Complete => {
                 let shapes = results[0..depth].iter()
                     .map(|&it| {
                         let mino_index = it / self.width;
@@ -189,6 +155,9 @@ impl Aggregator {
                 };
                 if s { 1 } else { 0 }
             }
+            IndexNode::Abort => {
+                0
+            }
         }
     }
 
@@ -201,11 +170,11 @@ impl Aggregator {
         self.ok2(results, self.clipped_board.board(), (1u64 << results.len()) - 1, &mut hash_set, &move_rules)
     }
 
-    fn ok2(&self, results: &Vec<(&PredefinedPieceToAggregate, usize, Board64)>, board_: Board64, rest: u64, visited: &mut FxHashSet::<u64>, move_rules: &MoveRules<SrsKickTable>) -> bool {
+    fn ok2(&self, results: &Vec<(&PredefinedPieceToAggregate, usize, Board64)>, board_: Board64, remaining: u64, visited: &mut FxHashSet<u64>, move_rules: &MoveRules<SrsKickTable>) -> bool {
         let mut board2 = board_.clone();
         let deleted_key = board2.clear_lines();
 
-        let mut rest2 = rest;
+        let mut rest2 = remaining;
         while rest2 != 0 {
             let bit = rest2 & (-(rest2 as i64)) as u64;
 
@@ -227,7 +196,7 @@ impl Aggregator {
                 let spawn = mino.piece.shape.with(Orientation::North).with(self.spawn_position);
 
                 if move_rules.can_reach(placement, board2, spawn) {
-                    let next_rest = rest - bit;
+                    let next_rest = remaining - bit;
                     if next_rest == 0 {
                         return true;
                     }

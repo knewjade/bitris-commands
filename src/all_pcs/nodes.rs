@@ -1,30 +1,27 @@
 pub(crate) enum IndexNode {
-    // (next_item_id, item_length)
-    Jump(u32, u32),
+    // Indicates the placement of one of the items.
+    // 0(usize) is the head of the item id, and 1(usize) has the count of items (next_item_id, item_length).
+    ToItem(usize, u32),
 
-    // (next_index_id)
-    Skip(u32),
+    // Indicates no placement.
+    // 0(usize) is the index id to be seen next (next_index_id).
+    ToNextIndex(usize),
 
-    ToHi,
+    // Indicates that the sequence is valid.
+    Complete,
+
+    // Indicates that the sequence is invalid.
+    Abort,
 }
 
-pub(crate) enum ItemNode {
-    // (mino_index)
-    ToHi(u32),
-
-    // (mino_index, next_index_id)
-    ToIndex(u32, usize),
+pub(crate) struct ItemNode {
+    pub(crate) predefine_index: u32,
+    pub(crate) next_index_id: usize,
 }
 
-impl ItemNode {
-    pub(crate) fn mino_index(&self) -> u32 {
-        return *match self {
-            ItemNode::ToHi(mino_index) => { mino_index }
-            ItemNode::ToIndex(mino_index, _) => { mino_index }
-        };
-    }
-}
-
+// Starting at `indexes[0]` and moving back and forth between `indexes` and `items`, it represents a sequence of placements.
+// `IndexNode::ToItem` means to place one piece and jump to the next index once it is placed.
+// Follow until `Complete` or `Abort` appears, and the sequence can be `valid` or `invalid` when it appears.
 pub(crate) struct Nodes {
     pub(crate) indexes: Vec<IndexNode>,
     pub(crate) items: Vec<ItemNode>,
@@ -35,31 +32,36 @@ impl Nodes {
         Self { indexes: Vec::new(), items: Vec::new() }
     }
 
-    pub(crate) fn index_serial(&self) -> usize {
+    pub(crate) fn next_index_id(&self) -> usize {
         self.indexes.len()
     }
 
-    pub(crate) fn item_serial(&self) -> usize {
+    pub(crate) fn next_item_id(&self) -> usize {
         self.items.len()
     }
 
-    pub(crate) fn jump(&mut self, next_item_id: u32, item_length: u32) {
-        self.indexes.push(IndexNode::Jump(next_item_id, item_length));
+    pub(crate) fn go_to_items(&mut self, next_item_id: usize, item_length: u32) {
+        debug_assert!(0 < item_length);
+        self.indexes.push(IndexNode::ToItem(next_item_id, item_length));
     }
 
-    pub(crate) fn skip(&mut self, next_index_id: u32) {
-        self.indexes.push(IndexNode::Skip(next_index_id));
+    pub(crate) fn skip_to_next_index(&mut self, next_index_id: usize) {
+        self.indexes.push(IndexNode::ToNextIndex(next_index_id));
     }
 
-    pub(crate) fn complete2(&mut self) {
-        self.indexes.push(IndexNode::ToHi);
+    pub(crate) fn complete(&mut self) {
+        self.indexes.push(IndexNode::Complete);
     }
 
-    pub(crate) fn put(&mut self, mino_index: u32, next_index_id: usize) {
-        self.items.push(ItemNode::ToIndex(mino_index, next_index_id));
+    pub(crate) fn abort(&mut self) {
+        self.indexes.push(IndexNode::Abort);
     }
 
-    pub(crate) fn complete(&mut self, mino_index: u32) {
-        self.items.push(ItemNode::ToHi(mino_index));
+    pub(crate) fn push_item(&mut self, predefine_index: u32, next_index_id: usize) {
+        self.items.push(ItemNode { predefine_index, next_index_id });
+    }
+
+    pub(crate) fn head(&self) -> Option<&IndexNode> {
+        self.indexes.get(0)
     }
 }
