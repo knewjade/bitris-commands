@@ -5,11 +5,10 @@ use thiserror::Error;
 use crate::{ForEachVisitor, ShapeCounter, ShapeOrder, ShapeSequence};
 use crate::bit_shapes::BitShapes;
 
-/// Calculate the number of permutations.
+/// Calculate the count of permutations.
 fn calculate_permutation_size(len: usize, pop: usize) -> usize {
-    assert!(pop <= len);
-    assert!(0 < pop);
-    ((len - pop + 1)..=len).fold(1, |sum, it| sum * it)
+    debug_assert!(0 < pop && pop <= len);
+    ((len - pop + 1)..len).fold(len, |sum, it| sum * it)
 }
 
 /// A collection of elements to define the order/sequence of the shapes.
@@ -33,11 +32,13 @@ pub enum PatternElement {
 
     /// Permutations by taking all shapes from `ShapeCounter`. Duplicates are not removed.
     /// (like `[TIOLJSZ]p7`, `*!`)
+    ///
+    /// Panic if the shape counter is empty.
     Factorial(ShapeCounter),
 }
 
 impl PatternElement {
-    /// Returns all `Vec<Shape>`s represented by the pattern.
+    /// Returns all `Vec<Shape>`s represented by the element.
     pub fn to_shapes_vec(&self) -> Vec<Vec<Shape>> {
         match *self {
             PatternElement::One(shape) => vec![vec![shape]],
@@ -51,6 +52,7 @@ impl PatternElement {
                     .collect_vec()
             }
             PatternElement::Factorial(counter) => {
+                assert!(!counter.is_empty());
                 counter.to_pairs().into_iter()
                     .flat_map(|(shape, count)| { repeat_n(shape, count as usize).into_iter() })
                     .permutations(counter.len())
@@ -60,7 +62,7 @@ impl PatternElement {
     }
 
     /// The count of shapes the pattern has.
-    pub fn len_shapes_vec(&self) -> usize {
+    pub fn len_shapes(&self) -> usize {
         match *self {
             PatternElement::One(_) => 1,
             PatternElement::Fixed(_) => 1,
@@ -83,7 +85,21 @@ impl PatternElement {
                 assert!(0 < pop && pop <= counter.len());
                 pop
             }
-            PatternElement::Factorial(counter) => counter.len(),
+            PatternElement::Factorial(counter) => {
+                assert!(!counter.is_empty());
+                counter.len()
+            }
+        }
+    }
+
+    /// The count of shape counters the element has.
+    pub fn to_shape_counter_vec(&self) -> Vec<ShapeCounter> {
+        match *self {
+            PatternElement::One(shape) => vec![ShapeCounter::from(shape)],
+            PatternElement::Fixed(shapes) => vec![ShapeCounter::from(shapes.to_vec())],
+            PatternElement::Wildcard => Shape::all_into_iter().map(|shape| ShapeCounter::from(shape)).collect(),
+            PatternElement::Permutation(counter, pop) => counter.subset(pop),
+            PatternElement::Factorial(counter) => vec![counter],
         }
     }
 }
@@ -232,7 +248,7 @@ impl Pattern {
             return 0;
         }
         self.elements.iter()
-            .map(|it| it.len_shapes_vec())
+            .map(|it| it.len_shapes())
             .fold(1, |sum, it| sum * it)
     }
 
@@ -271,27 +287,27 @@ mod tests {
         let counter = ShapeCounter::from(vec![Shape::I]);
         let pattern = PatternElement::Permutation(counter, 1);
         assert_eq!(pattern.dim_shapes(), 1);
-        assert_eq!(pattern.len_shapes_vec(), 1);
+        assert_eq!(pattern.len_shapes(), 1);
 
         let counter = ShapeCounter::from(vec![Shape::I, Shape::O, Shape::T]);
         let pattern = PatternElement::Permutation(counter, 1);
         assert_eq!(pattern.dim_shapes(), 1);
-        assert_eq!(pattern.len_shapes_vec(), 3);
+        assert_eq!(pattern.len_shapes(), 3);
 
         let counter = ShapeCounter::from(vec![Shape::I, Shape::O, Shape::T]);
         let pattern = PatternElement::Permutation(counter, 2);
         assert_eq!(pattern.dim_shapes(), 2);
-        assert_eq!(pattern.len_shapes_vec(), 6);
+        assert_eq!(pattern.len_shapes(), 6);
 
         let counter = ShapeCounter::one_of_each();
         let pattern = PatternElement::Permutation(counter, 3);
         assert_eq!(pattern.dim_shapes(), 3);
-        assert_eq!(pattern.len_shapes_vec(), 210);
+        assert_eq!(pattern.len_shapes(), 210);
 
         let counter = ShapeCounter::one_of_each();
         let pattern = PatternElement::Permutation(counter, 5);
         assert_eq!(pattern.dim_shapes(), 5);
-        assert_eq!(pattern.len_shapes_vec(), 2520);
+        assert_eq!(pattern.len_shapes(), 2520);
     }
 
     #[test]
@@ -337,5 +353,46 @@ mod tests {
         assert_eq!(patterns.len_shapes_vec(), 5040 * 210);
         assert_eq!(patterns.dim_shapes(), 9);
         assert_eq!(patterns.to_sequences().len(), 5040 * 210);
+    }
+
+    #[test]
+    fn to_shape_counter_vec() {
+        use PatternElement::*;
+        assert_eq!(
+            One(Shape::T).to_shape_counter_vec(),
+            vec![ShapeCounter::one(Shape::T)],
+        );
+        assert_eq!(
+            Fixed(BitShapes::try_from(vec![Shape::T, Shape::O]).unwrap()).to_shape_counter_vec(),
+            vec![ShapeCounter::one(Shape::T) + Shape::O],
+        );
+        assert_eq!(
+            Wildcard.to_shape_counter_vec(),
+            vec![
+                ShapeCounter::one(Shape::T),
+                ShapeCounter::one(Shape::I),
+                ShapeCounter::one(Shape::O),
+                ShapeCounter::one(Shape::L),
+                ShapeCounter::one(Shape::J),
+                ShapeCounter::one(Shape::S),
+                ShapeCounter::one(Shape::Z),
+            ],
+        );
+        assert_eq!(
+            Permutation(ShapeCounter::one_of_each(), 6).to_shape_counter_vec(),
+            vec![
+                ShapeCounter::one_of_each() - Shape::T,
+                ShapeCounter::one_of_each() - Shape::I,
+                ShapeCounter::one_of_each() - Shape::O,
+                ShapeCounter::one_of_each() - Shape::L,
+                ShapeCounter::one_of_each() - Shape::J,
+                ShapeCounter::one_of_each() - Shape::S,
+                ShapeCounter::one_of_each() - Shape::Z,
+            ],
+        );
+        assert_eq!(
+            Factorial(ShapeCounter::one_of_each()).to_shape_counter_vec(),
+            vec![ShapeCounter::one_of_each()],
+        );
     }
 }

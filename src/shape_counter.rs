@@ -33,6 +33,16 @@ impl ShapeCounter {
     /// ```
     /// use bitris_commands::prelude::*;
     /// use Shape::*;
+    /// assert_eq!(ShapeCounter::one(T), ShapeCounter::from(vec![T]));
+    /// ```
+    #[inline]
+    pub fn one(shape: Shape) -> Self {
+        Self::single_shape(shape, 1)
+    }
+
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
     /// let counter = ShapeCounter::one_of_each();
     /// assert_eq!(counter.len(), 7);
     /// assert_eq!(counter, ShapeCounter::from(vec![T, I, O, L, J, S, Z]));
@@ -217,6 +227,41 @@ impl ops::AddAssign<ShapeCounter> for ShapeCounter {
     }
 }
 
+impl ops::Sub<ShapeCounter> for ShapeCounter {
+    type Output = ShapeCounter;
+
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// assert_eq!(
+    ///     ShapeCounter::single_shape(T, 3) - ShapeCounter::single_shape(T, 2),
+    ///     ShapeCounter::from(vec![T]),
+    /// );
+    /// ```
+    fn sub(self, rhs: ShapeCounter) -> Self::Output {
+        let mut new = self.counters;
+        for index in 0..7 {
+            new[index] -= rhs.counters[index];
+        }
+        ShapeCounter::new(new)
+    }
+}
+
+impl ops::SubAssign<ShapeCounter> for ShapeCounter {
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let mut counter = ShapeCounter::single_shape(T, 3);
+    /// counter -= ShapeCounter::single_shape(T, 2);
+    /// assert_eq!(counter, ShapeCounter::from(vec![T]));
+    /// ```
+    fn sub_assign(&mut self, rhs: ShapeCounter) {
+        for index in 0..7 {
+            self.counters[index] -= rhs.counters[index];
+        }
+    }
+}
+
 impl ops::Add<Shape> for ShapeCounter {
     type Output = ShapeCounter;
 
@@ -242,6 +287,34 @@ impl ops::AddAssign<Shape> for ShapeCounter {
     /// ```
     fn add_assign(&mut self, rhs: Shape) {
         self.counters[rhs as usize] += 1;
+    }
+}
+
+impl ops::Sub<Shape> for ShapeCounter {
+    type Output = ShapeCounter;
+
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// assert_eq!(ShapeCounter::single_shape(T, 3) - T, ShapeCounter::from(vec![T, T]));
+    /// ```
+    fn sub(self, rhs: Shape) -> Self::Output {
+        let mut new = self.counters;
+        new[rhs as usize] -= 1;
+        ShapeCounter::new(new)
+    }
+}
+
+impl ops::SubAssign<Shape> for ShapeCounter {
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let mut counter = ShapeCounter::single_shape(T, 3);
+    /// counter -= T;
+    /// assert_eq!(counter, ShapeCounter::from(vec![T, T]));
+    /// ```
+    fn sub_assign(&mut self, rhs: Shape) {
+        self.counters[rhs as usize] -= 1;
     }
 }
 
@@ -277,10 +350,46 @@ impl ops::AddAssign<&[Shape]> for ShapeCounter {
     }
 }
 
+impl ops::Sub<&[Shape]> for ShapeCounter {
+    type Output = ShapeCounter;
+
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// assert_eq!(ShapeCounter::single_shape(T, 3) - &[T, T], ShapeCounter::from(vec![T]));
+    /// ```
+    fn sub(self, rhs: &[Shape]) -> Self::Output {
+        let mut new = self.counters;
+        for &shape in rhs {
+            new[shape as usize] -= 1;
+        }
+        ShapeCounter::new(new)
+    }
+}
+
+impl ops::SubAssign<&[Shape]> for ShapeCounter {
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let mut counter = ShapeCounter::single_shape(T, 3);
+    /// counter += &[T, T];
+    /// assert_eq!(counter, ShapeCounter::from(vec![T]));
+    /// ```
+    fn sub_assign(&mut self, rhs: &[Shape]) {
+        for &shape in rhs {
+            self.counters[shape as usize] -= 1;
+        }
+    }
+}
+
 forward_ref_op! { ShapeCounter, + ShapeCounter, = ShapeCounter }
 forward_ref_op! { ShapeCounter, += ShapeCounter }
+forward_ref_op! { ShapeCounter, - ShapeCounter, = ShapeCounter }
+forward_ref_op! { ShapeCounter, -= ShapeCounter }
 forward_ref_op! { ShapeCounter, + Shape, = ShapeCounter }
 forward_ref_op! { ShapeCounter, += Shape }
+forward_ref_op! { ShapeCounter, - Shape, = ShapeCounter }
+forward_ref_op! { ShapeCounter, -= Shape }
 
 #[cfg(test)]
 mod tests {
