@@ -5,6 +5,12 @@ use itertools::Itertools;
 use crate::{ClippedBoard, ShapeCounter};
 use crate::all_pcs::{IndexedPieces, IndexNode, Nodes, PredefinedPiece, PredefinedPieceToAggregate};
 
+trait PcAggregationChecker {
+    fn checks(&self, shapes: Vec<Shape>) -> bool {
+        true
+    }
+}
+
 pub(crate) struct Aggregator {
     clipped_board: ClippedBoard,
     indexed_pieces: IndexedPieces<PredefinedPieceToAggregate>,
@@ -28,15 +34,15 @@ impl Aggregator {
             let mut vec = Vec::<Lines>::new();
 
             let height = clipped_board.height() as usize;
-            vec.resize(indexed_pieces.len() * height, Lines::blank());
 
             for mino_index in 0..indexed_pieces.len() {
                 let mino = &indexed_pieces[mino_index];
-                let head_index = mino_index * height;
                 for iy in 0..height {
-                    if mino.deleted_rows.test_at(iy) {
-                        vec[head_index + iy] = mino.using_rows;
-                    }
+                    vec.push(if mino.deleted_rows.test_at(iy) {
+                        mino.using_rows
+                    } else {
+                        Lines::blank()
+                    })
                 }
             }
 
@@ -51,11 +57,12 @@ impl Aggregator {
             return 0;
         }
 
-        let mut filled = [0; 100];
-        let mut results = [0; 100];
-        self.aggregate_(0, 0, &mut filled, &mut results, &|_| {
-            true
-        })
+        struct PcAggregationCheckerImpl;
+        impl PcAggregationChecker for PcAggregationCheckerImpl {}
+
+        let mut filled = [Lines::blank(); 100];
+        let mut results = Vec::new();
+        self.aggregate_(0, 0, &mut filled, &mut results, &PcAggregationCheckerImpl)
     }
 
     pub(crate) fn aggregate_with_shape_counters(&self, shape_counters: &Vec<ShapeCounter>) -> u64 {
@@ -63,23 +70,33 @@ impl Aggregator {
             return 0;
         }
 
-        let mut filled = [0; 100];
-        let mut results = [0; 100];
-        self.aggregate_(0, 0, &mut filled, &mut results, &|shapes| {
-            let counter = ShapeCounter::from(shapes);
-            shape_counters.iter().any(|it| {
-                it.contains_all(&counter)
-            })
-        })
+        struct PcAggregationCheckerImpl<'a> {
+            shape_counters: &'a Vec<ShapeCounter>,
+        }
+
+        impl PcAggregationChecker for PcAggregationCheckerImpl<'_> {
+            fn checks(&self, shapes: Vec<Shape>) -> bool {
+                let counter = ShapeCounter::from(shapes);
+                self.shape_counters.iter().any(|it| {
+                    it.contains_all(&counter)
+                })
+            }
+        }
+
+        let checker = PcAggregationCheckerImpl { shape_counters };
+
+        let mut filled = [Lines::blank(); 100];
+        let mut results = Vec::new();
+        self.aggregate_(0, 0, &mut filled, &mut results, &checker)
     }
 
     fn aggregate_(
         &self,
         index_id: usize,
         depth: usize,
-        filled: &mut [u64; 100],
-        results: &mut [usize; 100],
-        solution_validator: &impl Fn(Vec<Shape>) -> bool,
+        filled: &mut [Lines; 100],
+        results2: &mut Vec<usize>,
+        checker: &impl PcAggregationChecker,
     ) -> u64 {
         match self.nodes.indexes[index_id] {
             IndexNode::ToItem(next_item_id, item_length) => {
@@ -93,17 +110,17 @@ impl Aggregator {
                     let mino_index = mino_index_and_lx / self.width;
                     let predefine = &self.indexed_pieces[mino_index];
 
-                    let s = predefine.ys.iter().fold(0u64, |prev, y| {
+                    let s = predefine.ys.iter().fold(Lines::blank(), |prev, y| {
                         prev | filled[depth * height + *y]
                     });
 
                     // 注目しているミノを置く前の絶対に揃えられないラインが削除されていないといけないか
-                    if 0 < (s & predefine.deleted_rows.key) {
+                    if !(s & predefine.deleted_rows).is_blank() {
                         // 使っている
                         continue;
                     }
 
-                    results[depth] = mino_index_and_lx;
+                    results2.push(mino_index_and_lx);
 
                     let next_depth = depth + 1;
 
@@ -115,27 +132,29 @@ impl Aggregator {
                     // temp = [y]ラインにブロックがあると、使用できないライン一覧が記録されている
                     // ミノXの[y]がdeletedKeyに指定されていると、Xのブロックのあるラインは先に揃えられなくなる
                     for j in 0..height {
-                        filled[ni + j] = filled[ci + j] | self.using_rows_each_y[hi + j].key;
+                        filled[ni + j] = filled[ci + j] | self.using_rows_each_y[hi + j];
                     }
 
-                    success += self.aggregate_(item.next_index_id, next_depth, filled, results, solution_validator);
+                    success += self.aggregate_(item.next_index_id, next_depth, filled, results2, checker);
+
+                    results2.pop();
                 }
 
                 success
             }
             IndexNode::ToNextIndex(next_index_id) => {
-                self.aggregate_(next_index_id as usize, depth, filled, results, solution_validator)
+                self.aggregate_(next_index_id as usize, depth, filled, results2, checker)
             }
             IndexNode::Complete => {
-                let shapes = results[0..depth].iter()
+                let shapes = results2.iter()
                     .map(|&it| {
                         let mino_index = it / self.width;
                         let pre = &self.indexed_pieces[mino_index];
                         pre.piece.shape
                     })
                     .collect_vec();
-                let s = if solution_validator(shapes) {
-                    let x = results[0..depth].iter()
+                let s = if checker.checks(shapes) {
+                    let x = results2.iter()
                         .map(|&it| {
                             let (mino_index, lx) = (it / self.width, it % self.width);
                             let pre = &self.indexed_pieces[mino_index];
@@ -184,12 +203,13 @@ impl Aggregator {
             let mino = *mino;
 
             // ミノを置くためのラインがすべて削除されている
-            if (mino.deleted_rows.key & deleted_key.key) == mino.deleted_rows.key {
-                let original_by = mino.ys[0] as i32;
-                let mask = (1u64 << original_by) - 1;
-                let deleted_lines = mask & deleted_key.key;
+            if (mino.deleted_rows & deleted_key) == mino.deleted_rows {
+                let original_by = mino.ys[0];
+                let mask = Lines::filled_up_to(original_by);
 
-                let by = original_by - deleted_lines.count_ones() as i32;
+                let deleted_lines = mask & deleted_key;
+
+                let by = original_by as i32 - deleted_lines.count() as i32;
                 let placement = mino.piece.with(bl(*lx as i32, by));
 
                 // Spawn on top of the well to avoid getting stuck.

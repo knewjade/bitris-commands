@@ -7,6 +7,7 @@ use crate::all_pcs::{Builder, IndexedPieces, PredefinedPiece};
 // TODO SequenceやOrderをcollect()したい
 // TODO FromIteratorをじっそうする？
 // TODO assert! > debug_assert!
+// TODO &[]に対応させてたい
 
 /// A collection of errors that occur when making the executor.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]

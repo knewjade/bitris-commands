@@ -38,9 +38,9 @@ impl ShapeSequence {
         assert!(self.shapes.len() <= infer_size);
 
         if self.shapes.is_empty() {
-            let mut shapes = Vec::<FuzzyShape>::with_capacity(infer_size);
-            shapes.resize(infer_size, FuzzyShape::Unknown);
-            return vec![FuzzyShapeOrder::new(shapes)];
+            return vec![FuzzyShapeOrder::new(
+                vec![FuzzyShape::Unknown; infer_size],
+            )];
         }
 
         pub struct FuzzyOrderVecAggregator {
@@ -89,9 +89,7 @@ impl ShapeSequence {
             }
         }
 
-        let mut buffer = Vec::<FuzzyShape>::with_capacity(infer_size);
-        buffer.resize(infer_size, FuzzyShape::Unknown);
-
+        let mut buffer = vec![FuzzyShape::Unknown; infer_size];
         rec(&self.shapes, visitor, &mut buffer, infer_size, 0, 0);
     }
 }

@@ -37,7 +37,8 @@ impl FuzzyShapeOrder {
 
     /// See `expand_as_wildcard()` for details.
     pub(crate) fn expand_as_wildcard_walk(&self, visitor: &mut impl ForEachVisitor<[Shape]>) {
-        fn build(shapes: &Vec<FuzzyShape>, index: usize, buffer: &mut Vec<Shape>, visitor: &mut impl ForEachVisitor<[Shape]>) {
+        fn build(shapes: &Vec<FuzzyShape>, buffer: &mut Vec<Shape>, visitor: &mut impl ForEachVisitor<[Shape]>) {
+            let index = buffer.len();
             if shapes.len() <= index {
                 visitor.visit(buffer.as_slice());
                 return;
@@ -45,13 +46,15 @@ impl FuzzyShapeOrder {
 
             match shapes[index] {
                 FuzzyShape::Known(shape) => {
-                    buffer[index] = shape;
-                    build(shapes, index + 1, buffer, visitor);
+                    buffer.push(shape);
+                    build(shapes, buffer, visitor);
+                    buffer.pop();
                 }
                 FuzzyShape::Unknown => {
                     for shape in Shape::all_into_iter() {
-                        buffer[index] = shape;
-                        build(shapes, index + 1, buffer, visitor);
+                        buffer.push(shape);
+                        build(shapes, buffer, visitor);
+                        buffer.pop();
                     }
                 }
             }
@@ -59,8 +62,7 @@ impl FuzzyShapeOrder {
 
         assert!(!self.shapes.is_empty());
         let mut buffer = Vec::<Shape>::with_capacity(self.shapes.len());
-        buffer.resize(self.shapes.len(), Shape::T);
-        build(&self.shapes, 0, &mut buffer, visitor);
+        build(&self.shapes, &mut buffer, visitor);
     }
 }
 

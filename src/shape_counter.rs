@@ -377,7 +377,7 @@ impl ops::SubAssign<Shape> for ShapeCounter {
     }
 }
 
-impl ops::Add<&[Shape]> for ShapeCounter {
+impl<const N: usize> ops::Add<&[Shape; N]> for ShapeCounter {
     type Output = ShapeCounter;
 
     /// ```
@@ -385,7 +385,7 @@ impl ops::Add<&[Shape]> for ShapeCounter {
     /// use Shape::*;
     /// assert_eq!(ShapeCounter::single_shape(T, 3) + &[O, O], ShapeCounter::from(vec![T, T, T, O, O]));
     /// ```
-    fn add(self, rhs: &[Shape]) -> Self::Output {
+    fn add(self, rhs: &[Shape; N]) -> Self::Output {
         let mut new = self.counters;
         for &shape in rhs {
             new[shape as usize] += 1;
@@ -394,22 +394,22 @@ impl ops::Add<&[Shape]> for ShapeCounter {
     }
 }
 
-impl ops::AddAssign<&[Shape]> for ShapeCounter {
+impl<const N: usize> ops::AddAssign<&[Shape; N]> for ShapeCounter {
     /// ```
     /// use bitris_commands::prelude::*;
     /// use Shape::*;
     /// let mut counter = ShapeCounter::single_shape(T, 3);
     /// counter += &[O, O];
-    /// assert_eq!(counter, ShapeCounter::from(vec![T, T, T, O]));
+    /// assert_eq!(counter, ShapeCounter::from(vec![T, T, T, O, O]));
     /// ```
-    fn add_assign(&mut self, rhs: &[Shape]) {
+    fn add_assign(&mut self, rhs: &[Shape; N]) {
         for &shape in rhs {
             self.counters[shape as usize] += 1;
         }
     }
 }
 
-impl ops::Sub<&[Shape]> for ShapeCounter {
+impl<const N: usize> ops::Sub<&[Shape; N]> for ShapeCounter {
     type Output = ShapeCounter;
 
     /// ```
@@ -417,7 +417,7 @@ impl ops::Sub<&[Shape]> for ShapeCounter {
     /// use Shape::*;
     /// assert_eq!(ShapeCounter::single_shape(T, 3) - &[T, T], ShapeCounter::from(vec![T]));
     /// ```
-    fn sub(self, rhs: &[Shape]) -> Self::Output {
+    fn sub(self, rhs: &[Shape; N]) -> Self::Output {
         let mut new = self.counters;
         for &shape in rhs {
             new[shape as usize] -= 1;
@@ -426,15 +426,15 @@ impl ops::Sub<&[Shape]> for ShapeCounter {
     }
 }
 
-impl ops::SubAssign<&[Shape]> for ShapeCounter {
+impl<const N: usize> ops::SubAssign<&[Shape; N]> for ShapeCounter {
     /// ```
     /// use bitris_commands::prelude::*;
     /// use Shape::*;
     /// let mut counter = ShapeCounter::single_shape(T, 3);
     /// counter += &[T, T];
-    /// assert_eq!(counter, ShapeCounter::from(vec![T]));
+    /// assert_eq!(counter, ShapeCounter::from(vec![T; 5]));
     /// ```
-    fn sub_assign(&mut self, rhs: &[Shape]) {
+    fn sub_assign(&mut self, rhs: &[Shape; N]) {
         for &shape in rhs {
             self.counters[shape as usize] -= 1;
         }

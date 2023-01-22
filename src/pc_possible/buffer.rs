@@ -8,14 +8,7 @@ pub(crate) struct Buffer {
 
 impl Buffer {
     pub(crate) fn with_resized(size: usize) -> Self {
-        Self {
-            shapes: {
-                let mut vec = Vec::with_capacity(size);
-                vec.resize(size, Shape::T);
-                vec
-            },
-            index: 0,
-        }
+        Self { shapes: vec![Shape::T; size], index: 0 }
     }
 
     pub(crate) fn increment(&mut self, shape: Shape) {
