@@ -37,6 +37,15 @@ impl<T> Array4<T> {
     }
 
     #[inline]
+    fn get(&self, index: usize) -> Option<&T> {
+        if index < self.len() {
+            Some(&self.items[index])
+        } else {
+            None
+        }
+    }
+
+    #[inline]
     fn as_slice(&self) -> &[T] {
         &self.items[0..self.len()]
     }
@@ -112,6 +121,8 @@ mod tests {
         assert_eq!(array.len(), 1);
         assert_eq!(array.as_slice(), &[1]);
         assert_eq!(array[0], 1);
+        assert_eq!(array.get(0), Some(&1));
+        assert_eq!(array.get(1), None);
     }
 
     #[test]
@@ -121,6 +132,8 @@ mod tests {
         assert_eq!(array.as_slice(), &[1, 2]);
         assert_eq!(array[0], 1);
         assert_eq!(array[1], 2);
+        assert_eq!(array.get(1), Some(&2));
+        assert_eq!(array.get(2), None);
     }
 
     #[test]
@@ -131,6 +144,8 @@ mod tests {
         assert_eq!(array[0], 1);
         assert_eq!(array[1], 2);
         assert_eq!(array[2], 3);
+        assert_eq!(array.get(2), Some(&3));
+        assert_eq!(array.get(3), None);
     }
 
     #[test]
@@ -142,6 +157,8 @@ mod tests {
         assert_eq!(array[1], 2);
         assert_eq!(array[2], 3);
         assert_eq!(array[3], 4);
+        assert_eq!(array.get(3), Some(&4));
+        assert_eq!(array.get(4), None);
     }
 
     #[test]
