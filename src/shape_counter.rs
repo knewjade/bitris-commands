@@ -115,7 +115,37 @@ impl ShapeCounter {
         self.counters.iter().all(|&it| it == 0)
     }
 
+    /// Return a new shape counter taking the maximum value of each.
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let c1 = ShapeCounter::from(vec![O, T, T, S]);
+    /// let c2 = ShapeCounter::from(vec![O, O, T]);
+    /// assert_eq!(c1.merge_by_max(&c2), ShapeCounter::from(vec![O, O, T, T, S]));
+    /// ```
+    pub fn merge_by_max(&self, rhs: &ShapeCounter) -> ShapeCounter {
+        let mut new = [0; 7];
+        for index in 0..7 {
+            new[index] = cmp::max(self.counters[index], rhs.counters[index]);
+        }
+        ShapeCounter::new(new)
+    }
+
     /// Returns a subset of shape counter with N shapes.
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let counter = ShapeCounter::from(vec![T, T, O, S]);
+    /// assert_eq!(
+    ///     counter.subset(2),
+    ///     vec![
+    ///         ShapeCounter::from(vec![O, S]),
+    ///         ShapeCounter::from(vec![T, S]),
+    ///         ShapeCounter::from(vec![T, O]),
+    ///         ShapeCounter::from(vec![T, T]),
+    ///     ],
+    /// );
+    /// ```
     pub fn subset(&self, pop: usize) -> Vec<ShapeCounter> {
         if pop == 0 {
             return vec![ShapeCounter::empty()];
