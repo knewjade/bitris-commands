@@ -15,10 +15,10 @@ pub mod prelude {
     pub use crate::{
         bit_shapes::*,
         clipped_board::*,
-        shape_sequence::*,
         patterns::*,
-        shape_order::*,
         shape_counter::*,
+        shape_order::*,
+        shape_sequence::*,
         traits::*,
     };
 }
@@ -28,10 +28,10 @@ pub mod all_pcs;
 
 mod bit_shapes;
 mod clipped_board;
-mod shape_sequence;
 mod patterns;
-mod shape_order;
 mod shape_counter;
+mod shape_order;
+mod shape_sequence;
 mod traits;
 
 mod internal_macros;
