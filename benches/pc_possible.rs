@@ -11,7 +11,7 @@ fn pc_possible(data: &PcPossibleBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
     let executor = pc_possible::PcPossibleBulkExecutor::try_new(
-        &move_rules, clipped_board, &data.patterns, data.allows_hold,
+        &move_rules, clipped_board, &data.pattern, data.allows_hold,
     ).unwrap();
     let result = executor.execute();
     assert_eq!(result.count_succeed(), data.expected);
@@ -22,7 +22,7 @@ struct PcPossibleBenchmarkData {
     id: String,
     board: Board64,
     height: u32,
-    patterns: Rc<Pattern>,
+    pattern: Rc<Pattern>,
     allow_move: AllowMove,
     allows_hold: bool,
     expected: u64,
@@ -43,7 +43,7 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ####...###
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::try_from(vec![
+            pattern: Rc::from(Pattern::try_from(vec![
                 Permutation(ShapeCounter::one_of_each(), 4),
             ]).unwrap()),
             allow_move: AllowMove::Softdrop,
@@ -60,7 +60,7 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ###....###
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::try_from(vec![
+            pattern: Rc::from(Pattern::try_from(vec![
                 Permutation(ShapeCounter::one_of_each(), 5),
             ]).unwrap()),
             allow_move: AllowMove::Softdrop,
@@ -77,7 +77,7 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 #......###
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::try_from(vec![
+            pattern: Rc::from(Pattern::try_from(vec![
                 Factorial(ShapeCounter::one_of_each()),
             ]).unwrap()),
             allow_move: AllowMove::Softdrop,
@@ -88,7 +88,7 @@ fn bench_pc_possibles(c: &mut Criterion) {
             id: format!("1st-cycle-partial"),
             board: Board64::blank(),
             height: 4,
-            patterns: Rc::from(Pattern::try_from(vec![
+            pattern: Rc::from(Pattern::try_from(vec![
                 Fixed(BitShapes::try_from(vec![
                     T, I, O, S, L, J, Z, T, I, O,
                 ]).unwrap()),
@@ -108,7 +108,7 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ######....
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::try_from(vec![
+            pattern: Rc::from(Pattern::try_from(vec![
                 One(T),
                 Permutation(ShapeCounter::one_of_each(), 4),
             ]).unwrap()),
@@ -126,7 +126,7 @@ fn bench_pc_possibles(c: &mut Criterion) {
                 ....######
             ").unwrap(),
             height: 4,
-            patterns: Rc::from(Pattern::try_from(vec![
+            pattern: Rc::from(Pattern::try_from(vec![
                 Factorial(ShapeCounter::one_of_each()),
             ]).unwrap()),
             allow_move: AllowMove::Softdrop,

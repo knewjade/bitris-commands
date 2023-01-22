@@ -1,4 +1,5 @@
 use std::{cmp, ops};
+use std::iter::zip;
 
 use bitris::Shape;
 use derive_more::Constructor;
@@ -204,6 +205,23 @@ impl ShapeCounter {
         build(&buffer, 0, pop, ShapeCounter::empty(), &mut counters);
 
         counters
+    }
+
+    /// Returns true when it has all the other's shapes.
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// assert!(ShapeCounter::from(vec![T, T, S]).contains_all(&ShapeCounter::from(vec![])));
+    /// assert!(ShapeCounter::from(vec![T, T, S]).contains_all(&ShapeCounter::from(vec![T, S])));
+    /// assert!(ShapeCounter::from(vec![T, T, S]).contains_all(&ShapeCounter::from(vec![T, T, S])));
+    ///
+    /// assert!(!ShapeCounter::from(vec![T, T, S]).contains_all(&ShapeCounter::from(vec![O])));
+    /// assert!(!ShapeCounter::from(vec![T, T, S]).contains_all(&ShapeCounter::from(vec![T, T, S, S])));
+    /// ```
+    pub fn contains_all(&self, other: &ShapeCounter) -> bool {
+        zip(self.counters, other.counters).all(|(mine, yours)| {
+            mine >= yours
+        })
     }
 }
 

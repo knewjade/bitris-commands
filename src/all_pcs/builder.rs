@@ -4,31 +4,35 @@ use itertools::Itertools;
 use tap::Conv;
 
 use crate::all_pcs::{Aggregator, IndexedPieces, Nodes, PredefinedPiece, PredefinedPieceToBuild};
-use crate::ClippedBoard;
+use crate::{ClippedBoard, ShapeCounter};
 
 pub(crate) struct Builder {
     clipped_board: ClippedBoard,
     indexed_pieces: IndexedPieces<PredefinedPiece>,
+    available: ShapeCounter,
     width: usize,
 }
 
 // TODO
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
 struct Frontier {
     board: u64,
+    available: ShapeCounter,
 }
 
 impl Builder {
     pub(crate) fn new(
         clipped_board: ClippedBoard,
         indexed_pieces: IndexedPieces<PredefinedPiece>,
+        available: ShapeCounter,
         width: usize,
     ) -> Self {
-        Self { clipped_board, indexed_pieces, width }
+        Self { clipped_board, indexed_pieces, available, width }
     }
 
-    pub(crate) fn to_aggregator(self) -> Aggregator {
+    pub(crate) fn to_aggregator(self, spawn_position: BlPosition) -> Aggregator {
         let nodes = self.build();
-        Aggregator::new(self.clipped_board, self.indexed_pieces, self.width, nodes)
+        Aggregator::new(self.clipped_board, self.indexed_pieces, self.width, nodes, spawn_position)
     }
 
     fn build(&self) -> Nodes {
@@ -41,9 +45,9 @@ impl Builder {
         let mut nodes = Nodes::empty();
         let mut frontiers = Vec::<Frontier>::new();
 
-        frontiers.push(Frontier { board: 0 });
+        frontiers.push(Frontier { board: 0, available: self.available });
 
-        let mut hash_map = FxHashMap::<u64, usize>::default();
+        let mut hash_map = FxHashMap::<Frontier, usize>::default();
 
         for lx in 0..self.width {
             for y in 0..height {
@@ -98,16 +102,24 @@ impl Builder {
                     u64::MAX
                 };
 
-                assert!(nodes.index_serial() < frontiers.len());
+                debug_assert!(nodes.index_serial() < frontiers.len());
 
                 for tail in (nodes.index_serial())..(frontiers.len()) {
-                    let current_bits = frontiers[tail].board | board_mask; // TODO sliceで置き換えられる?
+                    let frontier = &frontiers[tail];
+                    let available = frontier.available;
+                    let current_bits = frontier.board | board_mask; // TODO sliceで置き換えられる?
+
                     if current_bits & 1 == 0 {
                         // No block at `index`
                         let start_item_node_index = nodes.item_serial();
                         let mut item_size = 0usize;
 
+                        let available = frontier.available;
                         for (mino_index, mino) in &minos {
+                            if available[mino.piece.shape] == 0 {
+                                continue;
+                            }
+
                             let mino_index = *mino_index as u32;
                             if (current_bits & mino.vertical_relative_block) == 0 {
                                 // Can put mino
@@ -122,16 +134,18 @@ impl Builder {
                                 }
 
                                 let hash_key = next_block >> 1;
-                                if let Some(next_index_id) = hash_map.get(&hash_key) {
+                                let next_available = available - mino.piece.shape;
+                                let next_frontier = Frontier { board: hash_key, available: next_available };
+
+                                if let Some(next_index_id) = hash_map.get(&next_frontier) {
                                     nodes.put(mino_index, *next_index_id);
                                 } else {
                                     // Found new state
 
                                     // [Future reference] If `head` exceeds the `frontiers` size and rotate index, becomes nextIndexId != head
                                     let next_index_id = frontiers.len();
-                                    hash_map.insert(hash_key, next_index_id);
-
-                                    frontiers.push(Frontier { board: hash_key });
+                                    hash_map.insert(next_frontier, next_index_id);
+                                    frontiers.push(next_frontier);
 
                                     nodes.put(mino_index, next_index_id);
                                 }
@@ -145,7 +159,9 @@ impl Builder {
                     } else {
                         // Filled block at `index`
                         let hash_key = current_bits >> 1;
-                        if let Some(next_index_id) = hash_map.get(&hash_key) {
+                        let next_frontier = Frontier { board: hash_key, available };
+
+                        if let Some(next_index_id) = hash_map.get(&next_frontier) {
                             assert_eq!(tail, nodes.index_serial());
                             nodes.skip(*next_index_id as u32);
                         } else {
@@ -153,14 +169,17 @@ impl Builder {
 
                             // [Future reference] If `head` exceeds the `frontiers` size and rotate index, becomes nextIndexId != head
                             let next_index_id = frontiers.len();
-                            hash_map.insert(hash_key, next_index_id);
-
-                            frontiers.push(Frontier { board: hash_key });
+                            hash_map.insert(next_frontier, next_index_id);
+                            frontiers.push(next_frontier);
 
                             assert_eq!(tail, nodes.index_serial());
                             nodes.skip(next_index_id as u32);
                         }
                     }
+                }
+
+                if nodes.index_serial() == frontiers.len() {
+                    return Nodes::empty();
                 }
             }
         }
