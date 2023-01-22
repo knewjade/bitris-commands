@@ -64,6 +64,17 @@ impl ShapeCounter {
         ShapeCounter::new(counters)
     }
 
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let counter = ShapeCounter::max();
+    /// assert_eq!(counter.len(), 255 * 7);
+    /// ```
+    #[inline]
+    pub fn max() -> Self {
+        ShapeCounter::new([u8::MAX; 7])
+    }
+
     #[inline]
     pub fn len(&self) -> usize {
         self.counters.into_iter()
@@ -408,6 +419,39 @@ impl ops::SubAssign<&[Shape]> for ShapeCounter {
     fn sub_assign(&mut self, rhs: &[Shape]) {
         for &shape in rhs {
             self.counters[shape as usize] -= 1;
+        }
+    }
+}
+
+impl ops::Mul<u8> for ShapeCounter {
+    type Output = ShapeCounter;
+
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let mut counter = ShapeCounter::single_shape(T, 2) + ShapeCounter::single_shape(I, 1);
+    /// assert_eq!(counter * 2, ShapeCounter::from(vec![T, T, T, T, I, I]));
+    /// ```
+    fn mul(self, rhs: u8) -> Self::Output {
+        let mut new = self.counters;
+        for index in 0..7 {
+            new[index] *= rhs;
+        }
+        ShapeCounter::new(new)
+    }
+}
+
+impl ops::MulAssign<u8> for ShapeCounter {
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let mut counter = ShapeCounter::single_shape(T, 2) + ShapeCounter::single_shape(I, 1);
+    /// counter *= 2;
+    /// assert_eq!(counter, ShapeCounter::from(vec![T, T, T, T, I, I]));
+    /// ```
+    fn mul_assign(&mut self, rhs: u8) {
+        for index in 0..7 {
+            self.counters[index] *= rhs;
         }
     }
 }

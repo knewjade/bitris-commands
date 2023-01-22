@@ -171,37 +171,42 @@ impl Pattern {
 
     #[allow(dead_code)]
     fn walk_shapes(&self, visitor: &mut impl ForEachVisitor<Vec<Shape>>) {
-        let all_shapes_vec: Vec<Vec<Vec<Shape>>> = self.elements.clone()
-            .into_iter()
-            .map(|it| it.to_shapes_vec())
-            .collect();
+        struct Buffer<'a> {
+            all_vec: &'a Vec<Vec<Vec<Shape>>>,
+            buffer: Vec<Shape>,
+        }
 
-        let mut buffer: Vec<Shape> = Vec::with_capacity(self.dim_shapes());
-
-        fn build(
-            all_shapes_vec: &Vec<Vec<Vec<Shape>>>,
-            index: usize,
-            buffer: &mut Vec<Shape>,
-            visitor: &mut impl ForEachVisitor<Vec<Shape>>,
-        ) {
-            if index < all_shapes_vec.len() - 1 {
-                for shapes in &all_shapes_vec[index] {
-                    let size = buffer.len();
-                    buffer.extend(shapes.iter());
-                    build(all_shapes_vec, index + 1, buffer, visitor);
-                    buffer.resize(size, Shape::T);
-                }
-            } else {
-                for shapes in &all_shapes_vec[index] {
-                    let size = buffer.len();
-                    buffer.extend(shapes.iter());
-                    visitor.visit(buffer);
-                    buffer.resize(size, Shape::T);
+        impl Buffer<'_> {
+            fn build(&mut self, index: usize, visitor: &mut impl ForEachVisitor<Vec<Shape>>) {
+                if index < self.all_vec.len() - 1 {
+                    for shapes in &self.all_vec[index] {
+                        let size = self.buffer.len();
+                        self.buffer.extend(shapes.iter());
+                        self.build(index + 1, visitor);
+                        self.buffer.resize(size, Shape::T);
+                    }
+                } else {
+                    for shapes in &self.all_vec[index] {
+                        let size = self.buffer.len();
+                        self.buffer.extend(shapes.iter());
+                        visitor.visit(&self.buffer);
+                        self.buffer.resize(size, Shape::T);
+                    }
                 }
             }
         }
 
-        build(&all_shapes_vec, 0, &mut buffer, visitor);
+        let all_vec: Vec<Vec<Vec<Shape>>> = self.elements.clone()
+            .into_iter()
+            .map(|it| it.to_shapes_vec())
+            .collect();
+
+        let mut buffer = Buffer {
+            all_vec: &all_vec,
+            buffer: Vec::with_capacity(self.dim_shapes()),
+        };
+
+        buffer.build(0, visitor);
     }
 
     #[allow(dead_code)]
@@ -258,6 +263,61 @@ impl Pattern {
         self.elements.iter()
             .map(|it| it.dim_shapes())
             .fold(0, |sum, it| sum + it)
+    }
+
+    #[allow(dead_code)]
+    fn walk_shape_counters(&self, visitor: &mut impl ForEachVisitor<ShapeCounter>) {
+        struct Buffer<'a> {
+            all_vec: &'a Vec<Vec<ShapeCounter>>,
+        }
+
+        impl Buffer<'_> {
+            fn build(&mut self, index: usize, buffer: ShapeCounter, visitor: &mut impl ForEachVisitor<ShapeCounter>) {
+                if index < self.all_vec.len() - 1 {
+                    for shapes in &self.all_vec[index] {
+                        self.build(index + 1, buffer + shapes, visitor);
+                    }
+                } else {
+                    for shapes in &self.all_vec[index] {
+                        visitor.visit(&(buffer + shapes));
+                    }
+                }
+            }
+        }
+
+        let all_vec: Vec<Vec<ShapeCounter>> = self.elements.clone()
+            .into_iter()
+            .map(|it| it.to_shape_counter_vec())
+            .collect();
+
+        let mut buffer = Buffer {
+            all_vec: &all_vec,
+        };
+
+        buffer.build(0, ShapeCounter::empty(), visitor);
+    }
+
+    /// Return all shape counters that the pattern may have.
+    pub fn to_shape_counter_vec(&self) -> Vec<ShapeCounter> {
+        if self.elements.is_empty() {
+            return Vec::new();
+        }
+
+        struct Aggregator {
+            out: Vec<ShapeCounter>,
+        }
+
+        impl ForEachVisitor<ShapeCounter> for Aggregator {
+            fn visit(&mut self, shape_counters: &ShapeCounter) {
+                self.out.push(shape_counters.clone());
+            }
+        }
+
+        let mut visitor = Aggregator { out: Vec::new() };
+
+        self.walk_shape_counters(&mut visitor);
+
+        visitor.out
     }
 }
 
@@ -356,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn to_shape_counter_vec() {
+    fn pattern_element_to_shape_counter_vec() {
         use PatternElement::*;
         assert_eq!(
             One(Shape::T).to_shape_counter_vec(),
@@ -393,6 +453,40 @@ mod tests {
         assert_eq!(
             Factorial(ShapeCounter::one_of_each()).to_shape_counter_vec(),
             vec![ShapeCounter::one_of_each()],
+        );
+    }
+
+    #[test]
+    fn pattern_to_shape_counters_vec() {
+        use PatternElement::*;
+        use Shape::*;
+        assert_eq!(
+            Pattern::try_from(vec![
+                One(T),
+                Fixed(BitShapes::try_from(vec![T, O]).unwrap()),
+                Wildcard,
+            ]).unwrap().to_shape_counter_vec(),
+            vec![
+                ShapeCounter::from(vec![T, T, O, T]),
+                ShapeCounter::from(vec![T, T, O, I]),
+                ShapeCounter::from(vec![T, T, O, O]),
+                ShapeCounter::from(vec![T, T, O, L]),
+                ShapeCounter::from(vec![T, T, O, J]),
+                ShapeCounter::from(vec![T, T, O, S]),
+                ShapeCounter::from(vec![T, T, O, Z]),
+            ],
+        );
+        assert_eq!(
+            Pattern::try_from(vec![
+                Permutation(ShapeCounter::from(vec![T, T, O, I]), 2),
+                Factorial(ShapeCounter::from(vec![S, Z])),
+            ]).unwrap().to_shape_counter_vec(),
+            vec![
+                ShapeCounter::from(vec![O, I, S, Z]),
+                ShapeCounter::from(vec![T, O, S, Z]),
+                ShapeCounter::from(vec![T, I, S, Z]),
+                ShapeCounter::from(vec![T, T, S, Z]),
+            ],
         );
     }
 }
