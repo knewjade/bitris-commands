@@ -1,5 +1,6 @@
 use std::ops::Index;
 use std::slice::Iter;
+
 use bitris::prelude::*;
 use itertools::Itertools;
 
@@ -38,23 +39,55 @@ impl<T> Index<usize> for IndexedPieces<T> {
 pub(crate) struct PredefinedPiece {
     pub piece: Piece,
     pub ys: DynArray4<usize>,
-    pub locations: DynArray4<Location>,
+    pub locations: [Location; 4],
+    pub using_rows: Lines,
+    pub intercepted_rows: Lines,
 }
 
 #[derive(Clone, PartialEq, PartialOrd, Hash, Default, Debug)]
 pub(crate) struct PredefinedPieceToBuild {
     pub piece: Piece,
-    pub min_vertical_index: usize,
-    pub vertical_relative_block: u64,
+    pub min_y_at_x0: usize,
+    pub relative_vertical_blocks: u64,
 }
 
-#[derive(PartialEq, PartialOrd, Hash, Debug)]
-pub(crate) struct PredefinedPieceToAggregate {
+#[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
+pub(crate) struct PlacedPieceBlocks {
     pub piece: Piece,
     pub ys: DynArray4<usize>,
+    pub locations: [Location; 4],
     pub using_rows: Lines,
-    pub deleted_rows: Lines,
-    pub locations: DynArray4<Location>,
+    pub intercepted_rows: Lines,
+    pub lx: usize,
+    pub board: Board64,
+}
+
+impl PredefinedPiece {
+    // TODO 作成回数を少なくしたい
+    pub(crate) fn to_aggregate(&self, lx: usize) -> PlacedPieceBlocks {
+        let offset = Offset::new(lx as i32, 0);
+        let locations: [Location; 4] = self.locations.iter()
+            .map(|location| { location + offset })
+            .collect_vec()
+            .try_into()
+            .unwrap();
+
+        let board = locations.iter()
+            .fold(Board64::blank(), |mut merge, &location| {
+                merge.set_at(location);
+                merge
+            });
+
+        PlacedPieceBlocks {
+            piece: self.piece,
+            ys: self.ys,
+            locations,
+            using_rows: self.using_rows,
+            intercepted_rows: self.intercepted_rows,
+            lx,
+            board,
+        }
+    }
 }
 
 impl IndexedPieces<PredefinedPiece> {
@@ -74,7 +107,29 @@ impl IndexedPieces<PredefinedPiece> {
                         .collect_vec()
                         .try_into()
                         .unwrap();
-                    PredefinedPiece { piece, ys, locations }
+
+                    let using_rows = ys.iter()
+                        .fold(0u64, |merge, y| {
+                            merge | (1u64 << y)
+                        });
+
+                    let intercepted_rows = ys.iter()
+                        .skip(1)
+                        .fold((ys[0], 0u64), |(prev_y, merge), y| {
+                            let a = (1u64 << y) - 1;
+                            let b = (1u64 << (prev_y + 1)) - 1;
+                            let i = a ^ b;
+                            (*y, merge | (i))
+                        })
+                        .1;
+
+                    PredefinedPiece {
+                        piece,
+                        ys,
+                        locations,
+                        using_rows: Lines::new(using_rows),
+                        intercepted_rows: Lines::new(intercepted_rows),
+                    }
                 })
                 .collect()
         }
@@ -110,51 +165,14 @@ impl From<&IndexedPieces<PredefinedPiece>> for IndexedPieces<PredefinedPieceToBu
 
             PredefinedPieceToBuild {
                 piece: predefined_piece.piece,
-                min_vertical_index,
-                vertical_relative_block,
+                min_y_at_x0: min_vertical_index,
+                relative_vertical_blocks: vertical_relative_block,
             }
         }
 
         let pieces = value.pieces.iter()
             .map(|(index, predefined_piece)| {
                 (*index, make(predefined_piece, value.height))
-            })
-            .collect_vec();
-
-        Self { pieces, height: value.height }
-    }
-}
-
-
-impl From<&IndexedPieces<PredefinedPiece>> for IndexedPieces<PredefinedPieceToAggregate> {
-    fn from(value: &IndexedPieces<PredefinedPiece>) -> Self {
-        fn make(predefined_piece: &PredefinedPiece) -> PredefinedPieceToAggregate {
-            let deleted_rows = predefined_piece.ys.iter()
-                .skip(1)
-                .fold((predefined_piece.ys[0], 0u64), |(prev_y, merge), y| {
-                    let a = (1u64 << y) - 1;
-                    let b = (1u64 << (prev_y + 1)) - 1;
-                    let i = a ^ b;
-                    (*y, merge | (i))
-                }).1;
-
-            let using_rows = predefined_piece.ys.iter()
-                .fold(0u64, |merge, y| {
-                    merge | (1u64 << y)
-                });
-
-            PredefinedPieceToAggregate {
-                piece: predefined_piece.piece,
-                ys: predefined_piece.ys,
-                locations: predefined_piece.locations,
-                using_rows: Lines::new(using_rows),
-                deleted_rows: Lines::new(deleted_rows),
-            }
-        }
-
-        let pieces = value.pieces.iter()
-            .map(|(index, predefined_piece)| {
-                (*index, make(predefined_piece))
             })
             .collect_vec();
 

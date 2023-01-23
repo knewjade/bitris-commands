@@ -102,7 +102,7 @@ impl<T, const N: usize> Index<usize> for DynArrayN<T, N> {
 
 #[cfg(test)]
 mod tests {
-    use crate::internals::{DynArray4, ArrayNCreationError};
+    use crate::internals::{ArrayNCreationError, DynArray4};
 
     #[test]
     fn try_from() {
