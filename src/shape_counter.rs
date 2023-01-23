@@ -235,8 +235,14 @@ impl From<Shape> for ShapeCounter {
 
 impl From<Vec<Shape>> for ShapeCounter {
     fn from(shapes: Vec<Shape>) -> Self {
+        ShapeCounter::from_iter(shapes.into_iter())
+    }
+}
+
+impl FromIterator<Shape> for ShapeCounter {
+    fn from_iter<T: IntoIterator<Item=Shape>>(iter: T) -> Self {
         let mut counters: [u8; 7] = [0; 7];
-        for shape in shapes {
+        for shape in iter {
             counters[shape as usize] += 1;
         }
         ShapeCounter::new(counters)

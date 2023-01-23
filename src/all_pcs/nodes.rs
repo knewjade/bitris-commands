@@ -5,13 +5,6 @@ pub(crate) struct IndexId {
     pub id: usize,
 }
 
-impl IndexId {
-    #[inline]
-    pub(crate) fn head() -> Self {
-        Self { id: 0 }
-    }
-}
-
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Constructor)]
 pub(crate) struct ItemId {
     pub id: usize,
@@ -53,6 +46,11 @@ impl PieceKey {
     #[inline]
     pub(crate) fn lx(self, width: usize) -> usize {
         self.key as usize % width
+    }
+
+    #[inline]
+    pub(crate) fn x0(self, width: usize) -> Self {
+        Self { key: (self.piece_index(width) * width) as u32 }
     }
 }
 
@@ -104,17 +102,26 @@ impl Nodes {
     }
 
     #[inline]
+    pub(crate) fn head_index_id(&self) -> Option<IndexId> {
+        if self.indexes.is_empty() {
+            None
+        } else {
+            Some(IndexId::new(0))
+        }
+    }
+
+    #[inline]
     pub(crate) fn head(&self) -> Option<&IndexNode> {
         self.indexes.get(0)
     }
 
     #[inline]
-    pub(crate) fn index(&self, id: IndexId) -> &IndexNode {
-        &self.indexes[id.id]
+    pub(crate) fn index(&self, id: IndexId) -> Option<&IndexNode> {
+        self.indexes.get(id.id)
     }
 
     #[inline]
-    pub(crate) fn item(&self, id: ItemId) -> &ItemNode {
-        &self.items[id.id]
+    pub(crate) fn item(&self, id: ItemId) -> Option<&ItemNode> {
+        self.items.get(id.id)
     }
 }
