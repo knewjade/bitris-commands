@@ -3,13 +3,12 @@ use std::slice::Iter;
 
 use bitris::prelude::*;
 use itertools::Itertools;
-
-use crate::internals::DynArray4;
+use tinyvec::ArrayVec;
 
 #[derive(Clone, PartialEq, PartialOrd, Hash, Default, Debug)]
 pub(crate) struct IndexedPieces<T> {
     pub pieces: Vec<(usize, T)>,
-    pub height: usize,
+    pub height: u8,
 }
 
 impl<T> IndexedPieces<T> {
@@ -38,7 +37,7 @@ impl<T> Index<usize> for IndexedPieces<T> {
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub(crate) struct PredefinedPiece {
     pub piece: Piece,
-    pub ys: DynArray4<usize>,
+    pub ys: ArrayVec<[u8; 4]>,
     pub locations: [Location; 4],
     pub using_rows: Lines,
     pub intercepted_rows: Lines,
@@ -51,55 +50,20 @@ pub(crate) struct PredefinedPieceToBuild {
     pub relative_vertical_blocks: u64,
 }
 
-#[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub(crate) struct PlacedPieceBlocks {
-    pub piece: Piece,
-    pub ys: DynArray4<usize>,
-    pub locations: [Location; 4],
-    pub using_rows: Lines,
-    pub intercepted_rows: Lines,
-    pub lx: usize,
-    pub board: Board64,
-}
-
 impl PredefinedPiece {
     // TODO 作成回数を少なくしたい
-    pub(crate) fn to_aggregate(&self, lx: usize) -> PlacedPieceBlocks {
-        let offset = Offset::new(lx as i32, 0);
-        let locations: [Location; 4] = self.locations.iter()
-            .map(|location| { location + offset })
-            .collect_vec()
-            .try_into()
-            .unwrap();
-
-        let board = locations.iter()
-            .fold(Board64::blank(), |mut merge, &location| {
-                merge.set_at(location);
-                merge
-            });
-
-        PlacedPieceBlocks {
-            piece: self.piece,
-            ys: self.ys,
-            locations,
-            using_rows: self.using_rows,
-            intercepted_rows: self.intercepted_rows,
-            lx,
-            board,
-        }
+    pub(crate) fn to_aggregate(&self, lx: u8) -> PlacedPieceBlocks {
+        PlacedPiece::new(self.piece, lx, self.ys).into()
     }
 }
 
 impl IndexedPieces<PredefinedPiece> {
-    pub(crate) fn new(height: usize) -> Self {
-        fn make(piece: Piece, height: usize) -> Vec<PredefinedPiece> {
+    pub(crate) fn new(height: u8) -> Self {
+        fn make(piece: Piece, height: u8) -> Vec<PredefinedPiece> {
             let piece_blocks = piece.to_piece_blocks();
             (0..height).combinations(piece_blocks.height as usize)
-                .map(|mut ys| {
-                    ys.sort();
-                    DynArray4::try_from(ys).unwrap()
-                })
-                .map(|ys| {
+                .map(|ys| ys.into_iter().sorted().collect())
+                .map(|ys: ArrayVec<[u8; 4]>| {
                     let locations = piece_blocks.offsets
                         .into_iter()
                         .map(|offset| { offset - piece_blocks.bottom_left })
@@ -134,8 +98,7 @@ impl IndexedPieces<PredefinedPiece> {
                 .collect()
         }
 
-        let pieces = Piece::all_vec()
-            .into_iter()
+        let pieces = Piece::all_iter()
             .filter(|piece| piece.canonical().is_none())
             .flat_map(|piece| make(piece, height))
             .enumerate()
@@ -147,7 +110,7 @@ impl IndexedPieces<PredefinedPiece> {
 
 impl From<&IndexedPieces<PredefinedPiece>> for IndexedPieces<PredefinedPieceToBuild> {
     fn from(value: &IndexedPieces<PredefinedPiece>) -> Self {
-        fn make(predefined_piece: &PredefinedPiece, height: usize) -> PredefinedPieceToBuild {
+        fn make(predefined_piece: &PredefinedPiece, height: u8) -> PredefinedPieceToBuild {
             let min_vertical_index = predefined_piece.locations
                 .iter()
                 .filter(|location| { location.x == 0 })

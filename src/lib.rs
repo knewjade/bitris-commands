@@ -1,5 +1,3 @@
-extern crate core;
-
 pub use bit_shapes::*;
 pub use clipped_board::*;
 pub use shape_sequence::*;

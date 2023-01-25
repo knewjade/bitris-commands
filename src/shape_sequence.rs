@@ -1,4 +1,4 @@
-use bitris::Shape;
+use bitris::prelude::*;
 
 use crate::{BitShapes, ForEachVisitor, ShapeOrder};
 use crate::internal_macros::forward_impl_from;
@@ -105,7 +105,7 @@ forward_impl_from!(ShapeSequence, from BitShapes);
 
 #[cfg(test)]
 mod tests {
-    use bitris::*;
+    use bitris::prelude::*;
 
     use crate::internals::{FuzzyShape, FuzzyShapeOrder};
     use crate::ShapeSequence;

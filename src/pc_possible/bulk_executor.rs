@@ -94,7 +94,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// See `PcPossibleBulkExecutorCreationError` for error patterns.
     /// ```
     /// use std::str::FromStr;
-    /// use bitris::{Shape, Board64, MoveRules, AllowMove};
+    /// use bitris::prelude::*;
     /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
     /// use bitris_commands::pc_possible::PcPossibleBulkExecutor;
     ///
@@ -165,7 +165,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// If the clojure returns `ExecuteInstruction::Stop`, it stops.
     /// ```
     /// use std::str::FromStr;
-    /// use bitris::{Board64, MoveRules, AllowMove};
+    /// use bitris::prelude::*;
     /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
     /// use bitris_commands::pc_possible::{ExecuteInstruction, PcPossibleBulkExecutor};
     ///
@@ -309,7 +309,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         let moves = self.move_rules.generate_minimized_moves(clipped_board.board(), placement);
 
         for placement in moves {
-            if clipped_board.height() as i32 <= placement.tr_placement().position.ty {
+            if clipped_board.height() as i32 <= placement.to_tr_placement().position.ty {
                 continue;
             }
 
@@ -357,7 +357,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 mod tests {
     use std::str::FromStr;
 
-    use bitris::{AllowMove, Board64, BoardOp, MoveRules, Shape, xy};
+    use bitris::prelude::*;
 
     use crate::{BitShapes, ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
     use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};

@@ -70,7 +70,7 @@ impl<'a, T: RotationSystem> AllPcsFromCounterBulkExecutor<'a, T> {
 
     /// TODO desc Start the search for PC possible in bulk.
     pub fn execute(&self) -> u64 {
-        let indexed_pieces = IndexedPieces::<PredefinedPiece>::new(self.clipped_board.height() as usize);
+        let indexed_pieces = IndexedPieces::<PredefinedPiece>::new(self.clipped_board.height() as u8);
         let max_shape_counter = self.shape_counters.iter()
             .fold(ShapeCounter::empty(), |prev, shape_counter| {
                 prev.merge_by_max(shape_counter)

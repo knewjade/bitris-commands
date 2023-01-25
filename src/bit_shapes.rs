@@ -1,4 +1,4 @@
-use bitris::Shape;
+use bitris::prelude::*;
 use derive_more::Constructor;
 use thiserror::Error;
 
@@ -117,7 +117,7 @@ forward_impl_try_from!(BitShapes, BitShapesCreationError, from ShapeSequence);
 
 #[cfg(test)]
 mod tests {
-    use bitris::Shape;
+    use bitris::prelude::Shape;
     use itertools::Itertools;
 
     use crate::BitShapes;

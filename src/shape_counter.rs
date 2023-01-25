@@ -1,7 +1,7 @@
 use std::{cmp, ops};
 use std::iter::zip;
 
-use bitris::Shape;
+use bitris::prelude::Shape;
 use derive_more::Constructor;
 use itertools::Itertools;
 
@@ -491,7 +491,7 @@ forward_ref_op! { ShapeCounter, -= Shape }
 
 #[cfg(test)]
 mod tests {
-    use bitris::Shape;
+    use bitris::prelude::Shape;
 
     use crate::ShapeCounter;
 

@@ -1,4 +1,4 @@
-use bitris::Shape;
+use bitris::prelude::Shape;
 use itertools::{Itertools, repeat_n};
 use thiserror::Error;
 
@@ -324,7 +324,7 @@ impl Pattern {
 
 #[cfg(test)]
 mod tests {
-    use bitris::Shape;
+    use bitris::prelude::Shape;
 
     use crate::{Pattern, PatternCreationError, PatternElement, ShapeCounter};
     use crate::bit_shapes::BitShapes;

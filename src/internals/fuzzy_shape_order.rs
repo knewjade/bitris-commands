@@ -1,4 +1,4 @@
-use bitris::Shape;
+use bitris::prelude::Shape;
 
 use crate::{ForEachVisitor, ShapeOrder};
 use crate::internals::fuzzy_shape::FuzzyShape;
@@ -69,7 +69,7 @@ impl FuzzyShapeOrder {
 
 #[cfg(test)]
 mod tests {
-    use bitris::*;
+    use bitris::prelude::*;
 
     use crate::internals::{FuzzyShape, FuzzyShapeOrder};
     use crate::ShapeOrder;

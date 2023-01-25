@@ -1,4 +1,4 @@
-use bitris::Shape;
+use bitris::prelude::Shape;
 use itertools::Itertools;
 
 /// A collection of operations to take one from a shape order.
@@ -159,7 +159,7 @@ impl ShapeOrder {
 
 #[cfg(test)]
 mod tests {
-    use bitris::*;
+    use bitris::prelude::*;
 
     use crate::{PopOp, ShapeOrder};
 
