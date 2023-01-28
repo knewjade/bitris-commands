@@ -1,9 +1,8 @@
 use bitris::prelude::*;
 use fxhash::FxHashMap;
-use itertools::Itertools;
 
 use crate::{ClippedBoard, ShapeCounter};
-use crate::all_pcs::{IndexedPieces, IndexId, IndexNode, ItemId, Nodes, PieceKey, PredefinedPiece};
+use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes};
 
 trait PcAggregationChecker {
     fn checks(&self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) -> bool;
@@ -11,7 +10,7 @@ trait PcAggregationChecker {
 
 pub(crate) struct Aggregator {
     clipped_board: ClippedBoard,
-    map_placed_piece_blocks: FxHashMap<PieceKey, PlacedPieceBlocks>,
+    map_placed_piece_blocks: FxHashMap<PlacedPiece, PlacedPieceBlocks>,
     width: usize,
     nodes: Nodes,
     spawn_position: BlPosition,
@@ -20,22 +19,14 @@ pub(crate) struct Aggregator {
 impl Aggregator {
     pub(crate) fn new(
         clipped_board: ClippedBoard,
-        indexed_pieces: IndexedPieces<PredefinedPiece>,
+        placed_pieces: Vec<PlacedPiece>,
         width: usize,
         nodes: Nodes,
         spawn_position: BlPosition,
     ) -> Self {
-        let piece_keys = nodes.items.iter()
-            .map(|item| item.piece_key)
-            .sorted()
-            .dedup()
-            .collect_vec();
-
-        let map_placed_piece_blocks = piece_keys.iter()
-            .fold(FxHashMap::default(), |mut map, &piece_key| {
-                let predefined_piece = &indexed_pieces[piece_key.piece_index(width)];
-                let lx = piece_key.lx(width) as u8;
-                map.insert(piece_key, predefined_piece.to_aggregate(lx));
+        let map_placed_piece_blocks = placed_pieces.into_iter()
+            .fold(FxHashMap::default(), |mut map, placed_piece| {
+                map.insert(placed_piece, PlacedPieceBlocks::make(placed_piece));
                 map
             });
 
@@ -120,7 +111,7 @@ impl Aggregator {
         &self,
         index_id: IndexId,
         filled: Vec<Lines>,
-        placed: &mut Vec<PieceKey>,
+        placed_pieces: &mut Vec<PlacedPiece>,
         checker: &impl PcAggregationChecker,
     ) -> u64 {
         match self.nodes.index(index_id).unwrap() {
@@ -130,13 +121,13 @@ impl Aggregator {
 
                 let mut success = 0u64;
                 for item in item_ids {
-                    let predefine = &self.map_placed_piece_blocks[&item.piece_key];
+                    let blocks = &self.map_placed_piece_blocks[&item.placed_piece];
 
-                    let filled_rows = predefine.placed_piece.ys.iter()
+                    let filled_rows = blocks.placed_piece.ys.iter()
                         .fold(Lines::blank(), |prev, &y| prev | filled[y as usize]);
 
                     // 注目しているミノを置く前の絶対に揃えられないラインが削除されていないといけないか
-                    if !(filled_rows & predefine.intercepted_rows).is_blank() {
+                    if !(filled_rows & blocks.intercepted_rows).is_blank() {
                         // 使っている
                         continue;
                     }
@@ -147,31 +138,25 @@ impl Aggregator {
                         // 揃えられないラインを更新
                         // temp = [y]ラインにブロックがあると、使用できないライン一覧が記録されている
                         // ミノXの[y]がdeletedKeyに指定されていると、Xのブロックのあるラインは先に揃えられなくなる
-                        let mut rows = predefine.intercepted_rows.key;
-                        let using_rows = predefine.using_rows;
-                        while rows != 0 {
-                            let bit_row = rows & (-(rows as i64)) as u64;  // TODO Linesに持っていきたい
-                            rows -= bit_row;
-
-                            let index = bit_row.trailing_zeros() as usize;
-                            filled[index] |= using_rows;
+                        for y in blocks.intercepted_rows.ys_iter() {
+                            filled[y as usize] |= blocks.using_rows;
                         }
 
                         filled
                     };
 
-                    placed.push(item.piece_key);
-                    success += self.aggregate_recursively(item.next_index_id, next_filled, placed, checker);
-                    placed.pop();
+                    placed_pieces.push(item.placed_piece);
+                    success += self.aggregate_recursively(item.next_index_id, next_filled, placed_pieces, checker);
+                    placed_pieces.pop();
                 }
 
                 success
             }
             IndexNode::ToNextIndex(next_index_id) => {
-                self.aggregate_recursively(*next_index_id, filled, placed, checker)
+                self.aggregate_recursively(*next_index_id, filled, placed_pieces, checker)
             }
             IndexNode::Complete => {
-                let placed_vec = placed.iter()
+                let placed_vec = placed_pieces.iter()
                     .map(|it| &self.map_placed_piece_blocks[it])
                     .collect();
                 if checker.checks(&placed_vec) { 1 } else { 0 }

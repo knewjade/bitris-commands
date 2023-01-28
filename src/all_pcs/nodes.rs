@@ -1,3 +1,4 @@
+use bitris::placements::PlacedPiece;
 use derive_more::Constructor;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Constructor)]
@@ -26,36 +27,8 @@ pub(crate) enum IndexNode {
     Abort,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug, Constructor)]
-pub(crate) struct PieceKey {
-    pub key: u32,
-}
-
-impl PieceKey {
-    pub(crate) fn zip(width: usize, piece_index: &usize, lx: usize) -> Self {
-        Self { key: (piece_index * width + lx) as u32 }
-    }
-}
-
-impl PieceKey {
-    #[inline]
-    pub(crate) fn piece_index(self, width: usize) -> usize {
-        self.key as usize / width
-    }
-
-    #[inline]
-    pub(crate) fn lx(self, width: usize) -> usize {
-        self.key as usize % width
-    }
-
-    #[inline]
-    pub(crate) fn x0(self, width: usize) -> Self {
-        Self { key: (self.piece_index(width) * width) as u32 }
-    }
-}
-
 pub(crate) struct ItemNode {
-    pub(crate) piece_key: PieceKey,
+    pub(crate) placed_piece: PlacedPiece,
     pub(crate) next_index_id: IndexId,
 }
 
@@ -97,8 +70,8 @@ impl Nodes {
         self.indexes.push(IndexNode::Abort);
     }
 
-    pub(crate) fn push_item(&mut self, piece_key: PieceKey, next_index_id: IndexId) {
-        self.items.push(ItemNode { piece_key, next_index_id });
+    pub(crate) fn push_item(&mut self, placed_piece: PlacedPiece, next_index_id: IndexId) {
+        self.items.push(ItemNode { placed_piece, next_index_id });
     }
 
     #[inline]

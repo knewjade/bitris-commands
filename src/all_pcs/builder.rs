@@ -3,14 +3,42 @@ use std::ops::Range;
 use bitris::prelude::*;
 use fxhash::FxHashMap;
 use itertools::Itertools;
-use tap::Conv;
 
 use crate::{ClippedBoard, ShapeCounter};
-use crate::all_pcs::{Aggregator, IndexedPieces, IndexId, Nodes, PieceKey, PredefinedPiece, PredefinedPieceToBuild};
+use crate::all_pcs::{Aggregator, IndexId, Nodes};
+
+#[derive(Clone)]
+struct Predefine {
+    placed_piece: PlacedPiece,
+    min_y_on_left_x: usize,
+    relative_vertical_blocks: u64,
+}
+
+impl Predefine {
+    fn new(placed_piece: PlacedPiece, height: u8) -> Self {
+        let lx = placed_piece.lx as i32;
+
+        let locations = placed_piece.locations();
+        let min_y_on_left_x = locations.into_iter()
+            .filter(|location| location.x == lx)
+            .map(|location| location.y as usize)
+            .min()
+            .unwrap();
+
+        let height = height as i32;
+        let relative_vertical_blocks = locations.iter()
+            .fold(0u64, |prev, location| {
+                let shift = (location.x - lx) * height + location.y - min_y_on_left_x as i32;
+                prev | (1u64 << shift)
+            });
+
+        Self { placed_piece, min_y_on_left_x, relative_vertical_blocks }
+    }
+}
 
 pub(crate) struct Builder {
     clipped_board: ClippedBoard,
-    indexed_pieces: IndexedPieces<PredefinedPiece>,
+    placed_pieces: Vec<PlacedPiece>,
     available: ShapeCounter,
     width: usize,
 }
@@ -24,17 +52,17 @@ struct Frontier {
 impl Builder {
     pub(crate) fn new(
         clipped_board: ClippedBoard,
-        indexed_pieces: IndexedPieces<PredefinedPiece>,
+        placed_pieces: Vec<PlacedPiece>,
         available: ShapeCounter,
         width: usize,
     ) -> Self {
-        assert!(!indexed_pieces.is_empty());
-        Self { clipped_board, indexed_pieces, available, width }
+        assert!(!placed_pieces.is_empty());
+        Self { clipped_board, placed_pieces, available, width }
     }
 
     pub(crate) fn to_aggregator(self, spawn_position: BlPosition) -> Aggregator {
         let nodes = self.build();
-        Aggregator::new(self.clipped_board, self.indexed_pieces, self.width, nodes, spawn_position)
+        Aggregator::new(self.clipped_board, self.placed_pieces, self.width, nodes, spawn_position)
     }
 
     fn build(&self) -> Nodes {
@@ -76,27 +104,29 @@ impl Builder {
                 &mut self,
                 frontier_index: usize,
                 current_bits: u64,
-                predefines: &Vec<(PieceKey, &PredefinedPieceToBuild)>,
+                predefines: &Vec<Predefine>,
             ) {
                 let available = self.frontiers[frontier_index].available;
                 let head_item_node_id = self.nodes.next_item_id();
 
                 let mut item_size = 0usize;
-                for (piece_key, mino) in predefines {
-                    if available[mino.piece.shape] == 0 {
+                for predefine in predefines.into_iter() {
+                    let shape = predefine.placed_piece.piece.shape;
+                    if available[shape] == 0 {
                         continue;
                     }
 
-                    if (current_bits & mino.relative_vertical_blocks) == 0 {
-                        let next_block = current_bits | mino.relative_vertical_blocks;
+                    let relative_vertical_blocks = predefine.relative_vertical_blocks;
+                    if (current_bits & relative_vertical_blocks) == 0 {
+                        let next_block = current_bits | relative_vertical_blocks;
 
                         let next_frontier = Frontier {
                             board: next_block >> 1,
-                            available: available - mino.piece.shape,
+                            available: available - shape,
                         };
 
                         let next_index_id = self.get_next_index_id(next_frontier);
-                        self.nodes.push_item(*piece_key, next_index_id);
+                        self.nodes.push_item(predefine.placed_piece, next_index_id);
                         item_size += 1;
                     }
                 }
@@ -155,8 +185,12 @@ impl Builder {
             }
         }
 
-        let indexed_pieces = (&self.indexed_pieces).conv::<IndexedPieces<PredefinedPieceToBuild>>();
-        let (height, board) = (self.clipped_board.height() as usize, self.clipped_board.board());
+        let height = self.clipped_board.height() as usize;
+        let board = self.clipped_board.board();
+
+        let all_predefines = self.placed_pieces.iter()
+            .map(|&placed_piece| Predefine::new(placed_piece, height as u8))
+            .collect_vec();
 
         for lx in 0..self.width {
             for y in 0..height {
@@ -165,33 +199,10 @@ impl Builder {
                     continue;
                 }
 
-                // In scanning order, take out blocks up to four columns ahead of the current.
-                // (Take out the area reached by the I-piece.)
-                // Include wall blocks to filter the predefines that can be placed.
-                let board_mask = {
-                    let col4 = {
-                        let mut mask = 0u64;
-                        let col_mask = (1u64 << height) - 1;
-                        for x in 0..4 {
-                            let col = board.cols.get(lx + x).unwrap_or(&u64::MAX);
-                            mask |= (col & col_mask) << (height * x);
-                        }
-                        mask
-                    };
-
-                    // Match the current location to the LSB.
-                    let mask = col4 >> y;
-
-                    // The current location has no block always.
-                    debug_assert_eq!(mask & 1, 0);
-
-                    mask
-                };
-
-                let predefines = indexed_pieces.iter()
-                    .filter(|(_, mino)| mino.min_y_at_x0 == y)
-                    .filter(|(_, mino)| (board_mask & mino.relative_vertical_blocks) == 0)
-                    .map(|(piece_index, mino)| (PieceKey::zip(self.width, piece_index, lx), mino))
+                let predefines: Vec<Predefine> = all_predefines.iter()
+                    .filter(|&predefined| predefined.placed_piece.lx == lx as u8)
+                    .filter(|&predefined| predefined.min_y_on_left_x == y)
+                    .map(|it| it.clone())
                     .collect_vec();
 
                 buffer.setup_at_each_block();

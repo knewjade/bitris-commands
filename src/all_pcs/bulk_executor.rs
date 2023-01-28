@@ -2,7 +2,7 @@ use bitris::prelude::*;
 use thiserror::Error;
 
 use crate::{ClippedBoard, ShapeCounter};
-use crate::all_pcs::{Builder, IndexedPieces, PredefinedPiece};
+use crate::all_pcs::Builder;
 
 // TODO SequenceやOrderをcollect()したい
 // TODO FromIteratorをじっそうする？
@@ -70,14 +70,22 @@ impl<'a, T: RotationSystem> AllPcsFromCounterBulkExecutor<'a, T> {
 
     /// TODO desc Start the search for PC possible in bulk.
     pub fn execute(&self) -> u64 {
-        let indexed_pieces = IndexedPieces::<PredefinedPiece>::new(self.clipped_board.height() as u8);
         let max_shape_counter = self.shape_counters.iter()
             .fold(ShapeCounter::empty(), |prev, shape_counter| {
                 prev.merge_by_max(shape_counter)
             });
 
-        let aggregator = Builder::new(self.clipped_board, indexed_pieces, max_shape_counter, 10)
+        let board = self.clipped_board.board();
+        let placed_pieces: Vec<PlacedPiece> = PlacedPiece::make_canonical_all_iter(self.clipped_board.height() as usize)
+            .filter(|placed_piece| 0 < max_shape_counter[placed_piece.piece.shape])
+            .filter(|it| {
+                it.locations().iter().all(|&location| board.is_free_at(location))
+            })
+            .collect();
+
+        let aggregator = Builder::new(self.clipped_board, placed_pieces, max_shape_counter, 10)
             .to_aggregator(self.spawn_position);
+
         aggregator.aggregate_with_shape_counters(self.shape_counters)
     }
 }
@@ -91,6 +99,25 @@ mod tests {
 
     use crate::{ClippedBoard, ShapeCounter};
     use crate::all_pcs::{AllPcsFromCounterBulkExecutor, AllPcsFromCounterExecutorBulkCreationError};
+
+    #[test]
+    fn small_test_case() {
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
+        let board = Board64::from_str(
+            "
+            #..#######
+            #..#######
+        ").unwrap();
+        let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
+        let shape_counters = vec![
+            ShapeCounter::one(Shape::O),
+        ];
+        let executor = AllPcsFromCounterBulkExecutor::try_new(
+            move_rules, clipped_board, &shape_counters,
+        ).unwrap();
+        let result = executor.execute();
+        assert_eq!(result, 1);
+    }
 
     #[test]
     fn wildcard3() {
