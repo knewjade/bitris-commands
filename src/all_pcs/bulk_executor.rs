@@ -25,7 +25,7 @@ pub enum AllPcsFromCounterExecutorBulkCreationError {
 /// The executor to find PC possibles.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub struct AllPcsFromCounterBulkExecutor<'a, T: RotationSystem> {
-    move_rules: &'a MoveRules<'a, T>,
+    move_rules: MoveRules<'a, T>,
     clipped_board: ClippedBoard,
     shape_counters: &'a Vec<ShapeCounter>,
     spawn_position: BlPosition,
@@ -34,7 +34,7 @@ pub struct AllPcsFromCounterBulkExecutor<'a, T: RotationSystem> {
 impl<'a, T: RotationSystem> AllPcsFromCounterBulkExecutor<'a, T> {
     // TODO desc
     pub fn try_new(
-        move_rules: &'a MoveRules<T>,
+        move_rules: MoveRules<'a, T>,
         clipped_board: ClippedBoard,
         shape_counters: &'a Vec<ShapeCounter>,
     ) -> Result<Self, AllPcsFromCounterExecutorBulkCreationError> {
@@ -107,7 +107,7 @@ mod tests {
             ShapeCounter::one_of_each() * 3,
         ];
         let executor = AllPcsFromCounterBulkExecutor::try_new(
-            &move_rules, clipped_board, &shape_counters,
+            move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result, 79);
@@ -129,7 +129,7 @@ mod tests {
             ShapeCounter::from(vec![T, L, J, O, I]) * 3,
         ];
         let executor = AllPcsFromCounterBulkExecutor::try_new(
-            &move_rules, clipped_board, &shape_counters,
+            move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result, 57);
@@ -150,7 +150,7 @@ mod tests {
             ShapeCounter::one_of_each(),
         ];
         let executor = AllPcsFromCounterBulkExecutor::try_new(
-            &move_rules, clipped_board, &shape_counters,
+            move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result, 38);
@@ -172,7 +172,7 @@ mod tests {
             ShapeCounter::one_of_each() - S - Z,
         ];
         let executor = AllPcsFromCounterBulkExecutor::try_new(
-            &move_rules, clipped_board, &shape_counters,
+            move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result, 26);
@@ -195,7 +195,7 @@ mod tests {
             ShapeCounter::from(vec![Z, T, J]),
         ];
         let executor = AllPcsFromCounterBulkExecutor::try_new(
-            &move_rules, clipped_board, &shape_counters,
+            move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result, 2);
@@ -216,7 +216,7 @@ mod tests {
             ShapeCounter::one_of_each() * 10,
         ];
         let executor = AllPcsFromCounterBulkExecutor::try_new(
-            &move_rules, clipped_board, &shape_counters,
+            move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result, 0);
@@ -235,7 +235,7 @@ mod tests {
             ShapeCounter::one_of_each(),
         ];
         assert_eq!(
-            AllPcsFromCounterBulkExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
+            AllPcsFromCounterBulkExecutor::try_new(move_rules, clipped_board, &shape_counters).unwrap_err(),
             AllPcsFromCounterExecutorBulkCreationError::UnexpectedBoardSpaces,
         );
     }
@@ -255,7 +255,7 @@ mod tests {
             ShapeCounter::one(Shape::O),
         ];
         assert_eq!(
-            AllPcsFromCounterBulkExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
+            AllPcsFromCounterBulkExecutor::try_new(move_rules, clipped_board, &shape_counters).unwrap_err(),
             AllPcsFromCounterExecutorBulkCreationError::ShortCounterDimension,
         );
     }
@@ -268,7 +268,7 @@ mod tests {
             ShapeCounter::one_of_each() * 10,
         ];
         assert_eq!(
-            AllPcsFromCounterBulkExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
+            AllPcsFromCounterBulkExecutor::try_new(move_rules, clipped_board, &shape_counters).unwrap_err(),
             AllPcsFromCounterExecutorBulkCreationError::BoardIsTooHigh,
         );
     }

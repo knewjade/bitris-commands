@@ -10,7 +10,7 @@ fn all_pcs(data: &AllPcsFromShapeCounterBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
     let executor = all_pcs::AllPcsFromCounterBulkExecutor::try_new(
-        &move_rules, clipped_board, &data.shape_counters,
+        move_rules, clipped_board, &data.shape_counters,
     ).unwrap();
     let result = executor.execute();
     assert_eq!(result, data.expected);

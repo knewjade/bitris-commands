@@ -107,7 +107,7 @@ impl ShapeCounter {
     /// ```
     pub fn to_pairs(&self) -> Vec<(Shape, u8)> {
         let mut vec = Vec::<(Shape, u8)>::with_capacity(7);
-        for shape in Shape::all_into_iter() {
+        for shape in Shape::all_iter() {
             let counter = self.counters[shape as usize];
             if 0 < counter {
                 vec.push((shape, counter));
@@ -499,7 +499,7 @@ mod tests {
     fn one_of_each() {
         let counter = ShapeCounter::one_of_each();
         assert_eq!(counter.len(), 7);
-        assert!(Shape::all_into_iter().any(|shape| counter[shape] == 1));
+        assert!(Shape::all_iter().any(|shape| counter[shape] == 1));
         assert!(counter.to_pairs().into_iter().all(|(_, count)| count == 1));
     }
 

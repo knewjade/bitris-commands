@@ -43,7 +43,7 @@ impl PatternElement {
         match *self {
             PatternElement::One(shape) => vec![vec![shape]],
             PatternElement::Fixed(shapes) => vec![shapes.to_vec()],
-            PatternElement::Wildcard => Shape::all_into_iter().map(|it| vec![it]).collect(),
+            PatternElement::Wildcard => Shape::all_iter().map(|it| vec![it]).collect(),
             PatternElement::Permutation(counter, pop) => {
                 assert!(0 < pop && pop <= counter.len());
                 counter.to_pairs().into_iter()
@@ -97,7 +97,7 @@ impl PatternElement {
         match *self {
             PatternElement::One(shape) => vec![ShapeCounter::from(shape)],
             PatternElement::Fixed(shapes) => vec![ShapeCounter::from(shapes.to_vec())],
-            PatternElement::Wildcard => Shape::all_into_iter().map(|shape| ShapeCounter::from(shape)).collect(),
+            PatternElement::Wildcard => Shape::all_iter().map(|shape| ShapeCounter::from(shape)).collect(),
             PatternElement::Permutation(counter, pop) => counter.subset(pop),
             PatternElement::Factorial(counter) => vec![counter],
         }

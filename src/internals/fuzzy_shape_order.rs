@@ -51,7 +51,7 @@ impl FuzzyShapeOrder {
                     buffer.pop();
                 }
                 FuzzyShape::Unknown => {
-                    for shape in Shape::all_into_iter() {
+                    for shape in Shape::all_iter() {
                         buffer.push(shape);
                         build(shapes, buffer, visitor);
                         buffer.pop();

@@ -6,7 +6,7 @@ use crate::{ClippedBoard, ShapeCounter};
 use crate::all_pcs::{IndexedPieces, IndexId, IndexNode, ItemId, Nodes, PieceKey, PredefinedPiece};
 
 trait PcAggregationChecker {
-    fn checks(&self, placed_vec: &Vec<&PlacedPieceBlocks>) -> bool;
+    fn checks(&self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) -> bool;
 }
 
 pub(crate) struct Aggregator {
@@ -54,7 +54,12 @@ impl Aggregator {
 
         impl PcAggregationChecker for PcAggregationCheckerImpl {
             fn checks(&self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) -> bool {
-                can_stack(placed_piece_blocks_vec, self.clipped_board.board(), &MoveRules::default()).is_some()
+                PlacedPieceBlocksFlow::find_one_stackable(
+                    self.clipped_board.board(),
+                    placed_piece_blocks_vec.clone(),
+                    MoveRules::default(),
+                    self.spawn_position,
+                ).is_some()
             }
         }
 
@@ -80,9 +85,9 @@ impl Aggregator {
         }
 
         impl PcAggregationChecker for PcAggregationCheckerImpl<'_> {
-            fn checks(&self, placed_vec: &Vec<&PlacedPieceBlocks>) -> bool {
+            fn checks(&self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) -> bool {
                 let succeed = {
-                    let shape_counter: ShapeCounter = placed_vec.iter()
+                    let shape_counter: ShapeCounter = placed_piece_blocks_vec.iter()
                         .map(|it| it.placed_piece.piece.shape)
                         .collect();
                     self.shape_counters.iter().any(|it| it.contains_all(&shape_counter))
@@ -91,7 +96,12 @@ impl Aggregator {
                     return false;
                 }
 
-                can_stack(placed_vec, self.clipped_board.board(), &MoveRules::default()).is_some()
+                PlacedPieceBlocksFlow::find_one_stackable(
+                    self.clipped_board.board(),
+                    placed_piece_blocks_vec.clone(),
+                    MoveRules::default(),
+                    self.spawn_position,
+                ).is_some()
             }
         }
 
@@ -138,7 +148,7 @@ impl Aggregator {
                         // temp = [y]ラインにブロックがあると、使用できないライン一覧が記録されている
                         // ミノXの[y]がdeletedKeyに指定されていると、Xのブロックのあるラインは先に揃えられなくなる
                         let mut rows = predefine.intercepted_rows.key;
-                        let using_rows = predefine.using_rows();
+                        let using_rows = predefine.using_rows;
                         while rows != 0 {
                             let bit_row = rows & (-(rows as i64)) as u64;  // TODO Linesに持っていきたい
                             rows -= bit_row;

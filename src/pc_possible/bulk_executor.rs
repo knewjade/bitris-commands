@@ -79,7 +79,7 @@ pub enum PcPossibleExecutorBulkCreationError {
 /// The executor to find PC possibles.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub struct PcPossibleBulkExecutor<'a, T: RotationSystem> {
-    move_rules: &'a MoveRules<'a, T>,
+    move_rules: MoveRules<'a, T>,
     clipped_board: ClippedBoard,
     pattern: &'a Pattern,
     allows_hold: bool,
@@ -117,7 +117,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     ///
     /// let allows_hold = true;
     ///
-    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
+    /// let executor = PcPossibleBulkExecutor::try_new(move_rules, clipped_board, &pattern, allows_hold)
     ///     .expect("Failed to create an executor");
     ///
     /// let results = executor.execute();
@@ -126,7 +126,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// assert_eq!(results.count_accepted(), 840);
     /// ```
     pub fn try_new(
-        move_rules: &'a MoveRules<T>,
+        move_rules: MoveRules<'a, T>,
         clipped_board: ClippedBoard,
         pattern: &'a Pattern,
         allows_hold: bool,
@@ -186,7 +186,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     ///
     /// let allows_hold = false;
     ///
-    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
+    /// let executor = PcPossibleBulkExecutor::try_new(move_rules, clipped_board, &pattern, allows_hold)
     ///     .expect("Failed to create an executor");
     ///
     /// // Stops after 10 failures.
@@ -380,7 +380,7 @@ mod tests {
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         let executor = PcPossibleBulkExecutor::try_new(
-            &move_rules, clipped_board, &pattern, true,
+            move_rules, clipped_board, &pattern, true,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result.count_succeed(), 90);
@@ -411,7 +411,7 @@ mod tests {
                 Fixed(BitShapes::try_from(vec![J, O, I]).unwrap()),
             ]).unwrap();
             let executor = PcPossibleBulkExecutor::try_new(
-                &move_rules, clipped_board, &single_pattern, true,
+                move_rules, clipped_board, &single_pattern, true,
             ).unwrap();
             assert!(executor.execute_single());
         }
@@ -420,7 +420,7 @@ mod tests {
                 Fixed(BitShapes::try_from(vec![J, T, I]).unwrap()),
             ]).unwrap();
             let executor = PcPossibleBulkExecutor::try_new(
-                &move_rules, clipped_board, &single_pattern, true,
+                move_rules, clipped_board, &single_pattern, true,
             ).unwrap();
             assert!(!executor.execute_single());
         }
@@ -440,7 +440,7 @@ mod tests {
         ]).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleBulkExecutor::try_new(move_rules, clipped_board, &pattern, true).unwrap_err(),
             PcPossibleExecutorBulkCreationError::UnexpectedBoardSpaces,
         );
     }
@@ -458,7 +458,7 @@ mod tests {
         ]).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleBulkExecutor::try_new(move_rules, clipped_board, &pattern, true).unwrap_err(),
             PcPossibleExecutorBulkCreationError::ShortPatternDimension,
         );
     }
@@ -480,7 +480,7 @@ mod tests {
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         let executor = PcPossibleBulkExecutor::try_new(
-            &move_rules, clipped_board, &pattern, true,
+            move_rules, clipped_board, &pattern, true,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result.count_succeed(), 1);
@@ -505,7 +505,7 @@ mod tests {
         ].repeat((height / 4) as usize + 2)).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleBulkExecutor::try_new(move_rules, clipped_board, &pattern, true).unwrap_err(),
             PcPossibleExecutorBulkCreationError::BoardIsTooHigh,
         );
     }
