@@ -75,15 +75,7 @@ impl<'a, T: RotationSystem> AllPcsFromCounterBulkExecutor<'a, T> {
                 prev.merge_by_max(shape_counter)
             });
 
-        let board = self.clipped_board.board();
-        let placed_pieces: Vec<PlacedPiece> = PlacedPiece::make_canonical_all_iter(self.clipped_board.height() as usize)
-            .filter(|placed_piece| 0 < max_shape_counter[placed_piece.piece.shape])
-            .filter(|it| {
-                it.locations().iter().all(|&location| board.is_free_at(location))
-            })
-            .collect();
-
-        let aggregator = Builder::new(self.clipped_board, placed_pieces, max_shape_counter, 10)
+        let aggregator = Builder::new(self.clipped_board, max_shape_counter, 10)
             .to_aggregator(self.spawn_position);
 
         aggregator.aggregate_with_shape_counters(self.shape_counters)

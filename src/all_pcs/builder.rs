@@ -52,10 +52,18 @@ struct Frontier {
 impl Builder {
     pub(crate) fn new(
         clipped_board: ClippedBoard,
-        placed_pieces: Vec<PlacedPiece>,
         available: ShapeCounter,
         width: usize,
     ) -> Self {
+        let board = clipped_board.board();
+        let height = clipped_board.height() as usize;
+        let placed_pieces: Vec<PlacedPiece> = PlacedPiece::make_canonical_all_iter(height)
+            .filter(|placed_piece| 0 < available[placed_piece.piece.shape])
+            .filter(|it| {
+                it.locations().iter().all(|&location| board.is_free_at(location))
+            })
+            .collect();
+
         assert!(!placed_pieces.is_empty());
         Self { clipped_board, placed_pieces, available, width }
     }
