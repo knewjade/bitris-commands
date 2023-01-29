@@ -47,15 +47,41 @@ impl BitShapes {
     ///
     /// ```
     pub fn to_vec(self) -> Vec<Shape> {
-        let mut value = self.value;
-        let len = self.len();
-        let mut vec = Vec::with_capacity(len);
-        for _ in 0..len {
-            let shape_value = value % 7;
-            value /= 7;
-            vec.push(Shape::try_from(shape_value as usize).ok().unwrap());
+        self.into_iter().collect()
+    }
+}
+
+/// Iterator implementation for `BitShapes`.
+pub struct BitShapesIterator {
+    value: u64,
+    len: usize,
+}
+
+impl Iterator for BitShapesIterator {
+    type Item = Shape;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.len == 0 {
+            return None;
         }
-        vec
+
+        let shape_value = self.value % 7;
+        self.value /= 7;
+        self.len -= 1;
+        Some(Shape::try_from(shape_value as usize).unwrap())
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl IntoIterator for BitShapes {
+    type Item = Shape;
+    type IntoIter = BitShapesIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BitShapesIterator { value: self.value, len: self.len as usize }
     }
 }
 

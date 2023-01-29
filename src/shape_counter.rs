@@ -5,6 +5,7 @@ use bitris::prelude::Shape;
 use derive_more::Constructor;
 use itertools::Itertools;
 
+use crate::BitShapes;
 use crate::internal_macros::forward_ref_op;
 
 /// Holds the count of each shape. Each shape can hold up to 255 items.
@@ -233,9 +234,24 @@ impl From<Shape> for ShapeCounter {
     }
 }
 
+impl From<BitShapes> for ShapeCounter {
+    fn from(bit_shapes: BitShapes) -> Self {
+        bit_shapes.into_iter()
+            .fold(ShapeCounter::empty(), |shape_counter, shape| {
+                shape_counter + shape
+            })
+    }
+}
+
 impl From<Vec<Shape>> for ShapeCounter {
     fn from(shapes: Vec<Shape>) -> Self {
         ShapeCounter::from_iter(shapes.into_iter())
+    }
+}
+
+impl From<&[Shape]> for ShapeCounter {
+    fn from(shapes: &[Shape]) -> Self {
+        Self::from_iter(shapes.iter().map(|&shape| shape))
     }
 }
 

@@ -1,6 +1,8 @@
 use bitris::prelude::Shape;
 use itertools::Itertools;
 
+use crate::BitShapes;
+
 /// A collection of operations to take one from a shape order.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 pub enum PopOp {
@@ -156,6 +158,29 @@ impl ShapeOrder {
     }
 }
 
+impl From<&BitShapes> for ShapeOrder {
+    fn from(bit_shapes: &BitShapes) -> Self {
+        Self::new(bit_shapes.to_vec())
+    }
+}
+
+impl From<Vec<Shape>> for ShapeOrder {
+    fn from(shapes: Vec<Shape>) -> Self {
+        Self::new(shapes)
+    }
+}
+
+impl From<&[Shape]> for ShapeOrder {
+    fn from(shapes: &[Shape]) -> Self {
+        Self::new(shapes.iter().map(|&shape| shape).collect())
+    }
+}
+
+impl FromIterator<Shape> for ShapeOrder {
+    fn from_iter<T: IntoIterator<Item=Shape>>(iter: T) -> Self {
+        Self::new(iter.into_iter().collect())
+    }
+}
 
 #[cfg(test)]
 mod tests {

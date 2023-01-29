@@ -1,3 +1,5 @@
+use std::vec::IntoIter;
+
 use bitris::prelude::*;
 
 use crate::{BitShapes, ForEachVisitor, ShapeOrder};
@@ -19,17 +21,25 @@ impl ShapeSequence {
     }
 
     #[inline]
+    pub fn len(&self) -> usize {
+        self.shapes.len()
+    }
+
+    #[inline]
     pub fn shapes(&self) -> &[Shape] {
         self.shapes.as_slice()
+    }
+
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item=&Shape> {
+        self.shapes.iter()
     }
 
     #[inline]
     pub fn to_shape_order(&self) -> ShapeOrder {
         ShapeOrder::new(self.shapes.clone())
     }
-}
 
-impl ShapeSequence {
     /// If `self` is the resulting sequence of shapes, infer the order that could be the input.
     /// Let `infer_size` be the length of the order you wish to infer.
     /// If panics, `infer_size < sequence_length`.
@@ -96,7 +106,34 @@ impl ShapeSequence {
 
 impl From<&BitShapes> for ShapeSequence {
     fn from(bit_shapes: &BitShapes) -> Self {
-        Self { shapes: bit_shapes.to_vec() }
+        Self::new(bit_shapes.to_vec())
+    }
+}
+
+impl From<Vec<Shape>> for ShapeSequence {
+    fn from(shapes: Vec<Shape>) -> Self {
+        Self::new(shapes)
+    }
+}
+
+impl From<&[Shape]> for ShapeSequence {
+    fn from(shapes: &[Shape]) -> Self {
+        Self::new(shapes.iter().map(|&shape| shape).collect())
+    }
+}
+
+impl FromIterator<Shape> for ShapeSequence {
+    fn from_iter<T: IntoIterator<Item=Shape>>(iter: T) -> Self {
+        Self::new(iter.into_iter().collect())
+    }
+}
+
+impl IntoIterator for ShapeSequence {
+    type Item = Shape;
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.shapes.into_iter()
     }
 }
 
