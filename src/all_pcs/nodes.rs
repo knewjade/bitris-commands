@@ -84,11 +84,6 @@ impl Nodes {
     }
 
     #[inline]
-    pub(crate) fn head(&self) -> Option<&IndexNode> {
-        self.indexes.get(0)
-    }
-
-    #[inline]
     pub(crate) fn index(&self, id: IndexId) -> Option<&IndexNode> {
         self.indexes.get(id.id)
     }

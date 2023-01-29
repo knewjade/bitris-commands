@@ -70,7 +70,7 @@ impl Builder {
 
     pub(crate) fn to_aggregator(self, spawn_position: BlPosition) -> Aggregator {
         let nodes = self.build();
-        Aggregator::new(self.clipped_board, self.placed_pieces, self.width, nodes, spawn_position)
+        Aggregator::new(self.clipped_board, self.placed_pieces, nodes, spawn_position)
     }
 
     fn build(&self) -> Nodes {

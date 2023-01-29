@@ -11,7 +11,6 @@ trait PcAggregationChecker {
 pub(crate) struct Aggregator {
     clipped_board: ClippedBoard,
     map_placed_piece_blocks: FxHashMap<PlacedPiece, PlacedPieceBlocks>,
-    width: usize,
     nodes: Nodes,
     spawn_position: BlPosition,
 }
@@ -20,7 +19,6 @@ impl Aggregator {
     pub(crate) fn new(
         clipped_board: ClippedBoard,
         placed_pieces: Vec<PlacedPiece>,
-        width: usize,
         nodes: Nodes,
         spawn_position: BlPosition,
     ) -> Self {
@@ -30,38 +28,7 @@ impl Aggregator {
                 map
             });
 
-        Self { clipped_board, map_placed_piece_blocks, nodes, width, spawn_position }
-    }
-
-    pub(crate) fn aggregate(&self) -> u64 {
-        if self.nodes.indexes.is_empty() {
-            return 0;
-        }
-
-        struct PcAggregationCheckerImpl {
-            clipped_board: ClippedBoard,
-            spawn_position: BlPosition,
-        }
-
-        impl PcAggregationChecker for PcAggregationCheckerImpl {
-            fn checks(&self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) -> bool {
-                PlacedPieceBlocksFlow::find_one_stackable(
-                    self.clipped_board.board(),
-                    placed_piece_blocks_vec.clone(),
-                    MoveRules::default(),
-                    self.spawn_position,
-                ).is_some()
-            }
-        }
-
-        let checker = PcAggregationCheckerImpl {
-            clipped_board: self.clipped_board,
-            spawn_position: self.spawn_position,
-        };
-
-        let filled = vec![Lines::blank(); self.clipped_board.height() as usize];
-        let mut results = Vec::new();
-        self.aggregate_recursively(self.nodes.head_index_id().unwrap(), filled, &mut results, &checker)
+        Self { clipped_board, map_placed_piece_blocks, nodes, spawn_position }
     }
 
     pub(crate) fn aggregate_with_shape_counters(&self, shape_counters: &Vec<ShapeCounter>) -> u64 {
