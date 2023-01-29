@@ -9,11 +9,11 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: run tests for core
-        run: cargo test --release && cargo test --benches
-      - name: run tests for acceptance tests
-        run: cargo test --release
-        working-directory: ./acceptance_tests
       - name: run tests for example
         run: cargo test --release
         working-directory: ./example
+      - name: run tests for core
+        run: |
+          cargo test --release
+          cargo test --benches
+          cargo run --example pc_possible 
