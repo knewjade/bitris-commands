@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["knewjade"]
 
 [dependencies]
-bitris = { git = "https://github.com/knewjade/bitris.git", rev = "c340ce1bba9be11ae3a4ee00c65b0c2076442a37" }
+bitris = { git = "https://github.com/knewjade/bitris.git", rev = "4e1f1e492e1cd8b8a18aad89e55a44771c49523d" }
 itertools = "0.10.5"
 bitvec = "1.0.1"
 fxhash = "0.2.1"
@@ -32,3 +32,6 @@ harness = false
 [[bench]]
 name = "all_pcs"
 harness = false
+
+[profile.release]
+debug = true
