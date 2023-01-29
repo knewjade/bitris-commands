@@ -13,6 +13,7 @@ pub(crate) struct Aggregator {
     map_placed_piece_blocks: FxHashMap<PlacedPiece, PlacedPieceBlocks>,
     nodes: Nodes,
     spawn_position: BlPosition,
+    goal_board: Board64,
 }
 
 impl Aggregator {
@@ -28,7 +29,9 @@ impl Aggregator {
                 map
             });
 
-        Self { clipped_board, map_placed_piece_blocks, nodes, spawn_position }
+        let goal_board = Board64::filled_up_to(clipped_board.height() as u8);
+
+        Self { clipped_board, map_placed_piece_blocks, nodes, spawn_position, goal_board }
     }
 
     pub(crate) fn aggregate_with_shape_counters(&self, shape_counters: &Vec<ShapeCounter>) -> u64 {
@@ -54,12 +57,25 @@ impl Aggregator {
                     return false;
                 }
 
-                PlacedPieceBlocksFlow::find_one_stackable(
+                let x = PlacedPieceBlocksFlow::find_one_stackable(
                     self.clipped_board.board(),
                     placed_piece_blocks_vec.clone(),
                     MoveRules::default(),
                     self.spawn_position,
-                ).is_some()
+                ).is_some();
+                // // TODO
+                // if !x {
+                //     let y = PlacedPieceBlocksFlow::find_one_placeable(
+                //         self.clipped_board.board(),
+                //         placed_piece_blocks_vec.clone(),
+                //     ).is_some();
+                //     if !y {
+                //         println!("SKIP");
+                //         let x1: Vec<PlacedPiece> = placed_piece_blocks_vec.iter().map(|it| it.placed_piece).collect();
+                //         dbg!(x1);
+                //     }
+                // }
+                x
             }
         }
 
@@ -70,16 +86,16 @@ impl Aggregator {
         };
 
         let filled = vec![Lines::blank(); self.clipped_board.height() as usize];
-        let mut results = Vec::new();
+        let mut results = Vec::with_capacity((self.clipped_board.spaces() / 4) as usize);
         self.aggregate_recursively(self.nodes.head_index_id().unwrap(), filled, &mut results, &checker)
     }
 
-    fn aggregate_recursively(
-        &self,
+    fn aggregate_recursively<'a>(
+        &'a self,
         index_id: IndexId,
         filled: Vec<Lines>,
-        placed_pieces: &mut Vec<PlacedPiece>,
-        checker: &impl PcAggregationChecker,
+        placed_pieces: &mut Vec<&'a PlacedPieceBlocks>,
+        checker: &'a impl PcAggregationChecker,
     ) -> u64 {
         match self.nodes.index(index_id).unwrap() {
             IndexNode::ToItem(next_item_id, item_length) => {
@@ -88,33 +104,74 @@ impl Aggregator {
 
                 let mut success = 0u64;
                 for item in item_ids {
-                    let blocks = &self.map_placed_piece_blocks[&item.placed_piece];
+                    let current = &self.map_placed_piece_blocks[&item.placed_piece];
 
-                    let filled_rows = blocks.placed_piece.ys.iter()
+                    // 使っている行から、事前に揃えておく必要がある行を求める
+                    // （=placed_pieceの行を揃えるために、使うことができない行を取り出す。）
+                    // （他のミノの制約によって、いま注目している行を先に消さないと、そもそも置けないブロックが含まれている行）
+                    let filled_rows = current.placed_piece.ys.iter()
                         .fold(Lines::blank(), |prev, &y| prev | filled[y as usize]);
 
                     // 注目しているミノを置く前の絶対に揃えられないラインが削除されていないといけないか
-                    if !(filled_rows & blocks.intercepted_rows).is_blank() {
+                    if current.intercepted_rows.overlaps(&filled_rows) {
                         // 使っている
                         continue;
                     }
 
-                    let next_filled = {
-                        let mut filled = filled.clone();
+                    // TODO 楽観的プレイスメントチェック
+                    // すべてがうまった想定のボードから、
+                    // 過去のピースのうち必ずカレントよりも後ろになるピースを抜いたものに対して配置できるかを確認する。
+                    //
+                    // もしかすると、現在のキーチェックも同時に行える可能性が高い
 
-                        // 揃えられないラインを更新
-                        // temp = [y]ラインにブロックがあると、使用できないライン一覧が記録されている
-                        // ミノXの[y]がdeletedKeyに指定されていると、Xのブロックのあるラインは先に揃えられなくなる
-                        for y in blocks.intercepted_rows.ys_iter() {
-                            filled[y as usize] |= blocks.using_rows;
+                    let mut inserted = placed_pieces.len();
+                    for index in (0..placed_pieces.len()).rev() {
+                        if placed_pieces[index].intercepted_rows.overlaps(&current.using_rows) {
+                            // placed_pieceを置く前提となる行を、currentが使用している = placed_pieceはcurrentより先には置けない
+                            inserted = index;
+                        }
+                    }
+
+                    placed_pieces.insert(inserted, current);
+                    let mut ok = true;
+
+                    {
+                        let index = inserted;
+                        let current = placed_pieces[index];
+
+                        let mut board = self.goal_board.clone();
+                        let mut unset = false;
+                        for &blocks in &placed_pieces[index+1..] {
+                            if blocks.intercepted_rows.overlaps(&current.using_rows) {
+                                blocks.unset_all(&mut board);
+                                unset = true;
+                            }
                         }
 
-                        filled
-                    };
+                        if unset {
+                            current.unset_all(&mut board);
+                            board.clear_lines_partially(current.intercepted_rows);
 
-                    placed_pieces.push(item.placed_piece);
-                    success += self.aggregate_recursively(item.next_index_id, next_filled, placed_pieces, checker);
-                    placed_pieces.pop();
+                            let bl_location = current.placed_piece.bottom_left();
+                            let ground_placement = current.placed_piece.piece.with(bl(bl_location.x, bl_location.y));
+                            if !ground_placement.is_landing(&board) {
+                                ok = false;
+                            }
+                        }
+                    }
+
+                    if ok {
+                        // intercepted_rowsを先に揃えないと、消すことができない行をマッピング
+                        let next_filled = current.intercepted_rows.ys_iter()
+                            .fold(filled.clone(), |mut filled, y| {
+                                filled[y as usize] |= current.using_rows;
+                                filled
+                            });
+
+                        success += self.aggregate_recursively(item.next_index_id, next_filled, placed_pieces, checker);
+                    }
+
+                    placed_pieces.remove(inserted);
                 }
 
                 success
@@ -123,10 +180,38 @@ impl Aggregator {
                 self.aggregate_recursively(*next_index_id, filled, placed_pieces, checker)
             }
             IndexNode::Complete => {
-                let placed_vec = placed_pieces.iter()
-                    .map(|it| &self.map_placed_piece_blocks[it])
-                    .collect();
-                if checker.checks(&placed_vec) { 1 } else { 0 }
+                let mut ok = true;
+
+                for index in 0..=placed_pieces.len() - 1 {
+                    let current = placed_pieces[index];
+
+                    let mut board = self.goal_board.clone();
+                    let mut unset = false;
+                    for &blocks in &placed_pieces[index+1..] {
+                        if blocks.intercepted_rows.overlaps(&current.using_rows) {
+                            blocks.unset_all(&mut board);
+                            unset = true;
+                        }
+                    }
+
+                    if unset {
+                        current.unset_all(&mut board);
+                        board.clear_lines_partially(current.intercepted_rows);
+
+                        let bl_location = current.placed_piece.bottom_left();
+                        let ground_placement = current.placed_piece.piece.with(bl(bl_location.x, bl_location.y));
+                        if !ground_placement.is_landing(&board) {
+                            ok = false;
+                            break;
+                        }
+                    }
+                }
+
+                if ok {
+                    if checker.checks(placed_pieces) { 1 } else { 0 }
+                } else {
+                    0
+                }
             }
             IndexNode::Abort => { 0 }
         }
