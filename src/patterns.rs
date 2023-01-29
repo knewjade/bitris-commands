@@ -233,21 +233,21 @@ impl Pattern {
         visitor.out
     }
 
-    /// Returns all sequences represented by the patterns.
+    /// Returns all sequences represented by the pattern.
     pub fn to_sequences(&self) -> Vec<ShapeSequence> {
         self.to_shapes_vec().into_iter()
             .map(|it| ShapeSequence::new(it))
             .collect()
     }
 
-    /// Returns all orders represented by the patterns.
+    /// Returns all orders represented by the pattern.
     pub fn to_orders(&self) -> Vec<ShapeOrder> {
         self.to_shapes_vec().into_iter()
             .map(|it| ShapeOrder::new(it))
             .collect()
     }
 
-    /// The count of shapes the patterns has.
+    /// The count of shapes the pattern has.
     pub fn len_shapes_vec(&self) -> usize {
         if self.elements.is_empty() {
             return 0;
@@ -318,6 +318,83 @@ impl Pattern {
         self.walk_shape_counters(&mut visitor);
 
         visitor.out
+    }
+
+    /// Returns true if a shape sequence is represented by pattern.
+    ///
+    /// Note that even if the shape sequence exceeds the length of the pattern, it returns true if the subsequence from the beginning satisfies the condition.
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
+    /// let pattern = Pattern::try_from(vec![
+    ///     PatternElement::One(T),
+    ///     PatternElement::Wildcard,
+    ///     PatternElement::Permutation(vec![L, L, J].into(), 2),
+    /// ]).unwrap();
+    ///
+    /// // Success
+    /// assert!(pattern.contains(&vec![T, T, L, J].into()));
+    /// assert!(pattern.contains(&vec![T, I, L, J].into()));
+    /// assert!(pattern.contains(&vec![T, O, L, J].into()));
+    /// // ....
+    /// assert!(pattern.contains(&vec![T, Z, L, J].into()));
+    ///
+    /// assert!(pattern.contains(&vec![T, T, L, L].into()));
+    /// assert!(pattern.contains(&vec![T, T, L, J].into()));
+    /// assert!(pattern.contains(&vec![T, T, J, L].into()));
+    ///
+    /// assert!(pattern.contains(&vec![T, T, J, L, O].into()));
+    ///
+    /// // Failure
+    /// assert!(!pattern.contains(&vec![T].into()));
+    /// assert!(!pattern.contains(&vec![I, T, L, J].into()));
+    /// assert!(!pattern.contains(&vec![T, T, L, O].into()));
+    /// ````
+    pub fn contains(&self, shape_sequence: &ShapeSequence) -> bool {
+        let dim = self.dim_shapes();
+        if shape_sequence.len() < dim {
+            return false;
+        }
+
+        let all_shapes = shape_sequence.shapes();
+        let mut index = 0;
+        for element in self.elements.iter() {
+            match element {
+                PatternElement::One(shape) => {
+                    if all_shapes[index] != *shape {
+                        return false;
+                    }
+                    index += 1;
+                }
+                PatternElement::Fixed(shapes) => {
+                    let shapes = shapes.to_vec();
+                    let pop = shapes.len();
+                    if shapes.as_slice() != &all_shapes[index..index + pop] {
+                        return false;
+                    }
+                    index += pop;
+                }
+                PatternElement::Wildcard => {
+                    index += 1;
+                }
+                PatternElement::Permutation(counter, pop) => {
+                    assert!(0 < *pop && *pop <= counter.len());
+                    if !counter.contains_all(&ShapeCounter::from(&all_shapes[index..index + pop])) {
+                        return false;
+                    }
+                    index += pop;
+                }
+                PatternElement::Factorial(counter) => {
+                    assert!(!counter.is_empty());
+                    let pop = counter.len();
+                    if *counter != ShapeCounter::from(&all_shapes[index..index + pop]) {
+                        return false;
+                    }
+                    index += pop;
+                }
+            }
+        }
+        true
     }
 }
 
@@ -406,13 +483,13 @@ mod tests {
 
     #[test]
     fn large() {
-        let patterns = Pattern::try_from(vec![
+        let pattern = Pattern::try_from(vec![
             PatternElement::Permutation(ShapeCounter::one_of_each(), 6),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 3),
         ]).unwrap();
-        assert_eq!(patterns.len_shapes_vec(), 5040 * 210);
-        assert_eq!(patterns.dim_shapes(), 9);
-        assert_eq!(patterns.to_sequences().len(), 5040 * 210);
+        assert_eq!(pattern.len_shapes_vec(), 5040 * 210);
+        assert_eq!(pattern.dim_shapes(), 9);
+        assert_eq!(pattern.to_sequences().len(), 5040 * 210);
     }
 
     #[test]
@@ -488,5 +565,87 @@ mod tests {
                 ShapeCounter::from(vec![T, T, S, Z]),
             ],
         );
+    }
+
+    #[test]
+    fn can_accept_case1() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::One(T),
+            PatternElement::Fixed(vec![S, Z].try_into().unwrap()),
+            PatternElement::Wildcard,
+        ]).unwrap();
+
+        // Success
+        assert!(pattern.contains(&vec![T, S, Z, T].into()));
+        assert!(pattern.contains(&vec![T, S, Z, I].into()));
+        assert!(pattern.contains(&vec![T, S, Z, O].into()));
+        assert!(pattern.contains(&vec![T, S, Z, L].into()));
+        assert!(pattern.contains(&vec![T, S, Z, J].into()));
+        assert!(pattern.contains(&vec![T, S, Z, S].into()));
+        assert!(pattern.contains(&vec![T, S, Z, Z].into()));
+        assert!(pattern.contains(&vec![T, S, Z, T, O].into()));
+
+        // Failure at One
+        assert!(!pattern.contains(&vec![I, S, Z, T].into()));
+
+        // Failure at Fixed
+        assert!(!pattern.contains(&vec![T, O, Z, T].into()));
+        assert!(!pattern.contains(&vec![T, S, L, T].into()));
+    }
+
+    #[test]
+    fn can_accept_case2() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::One(T),
+            PatternElement::Factorial(vec![T, I, O].into()),
+        ]).unwrap();
+
+        // Success
+        assert!(pattern.contains(&vec![T, T, I, O].into()));
+        assert!(pattern.contains(&vec![T, T, O, I].into()));
+        assert!(pattern.contains(&vec![T, I, T, O].into()));
+        assert!(pattern.contains(&vec![T, I, O, T].into()));
+        assert!(pattern.contains(&vec![T, O, T, I].into()));
+        assert!(pattern.contains(&vec![T, O, I, T].into()));
+
+        // Failure at One
+        assert!(!pattern.contains(&vec![S, T, I, O].into()));
+
+        // Failure at Factorial
+        assert!(!pattern.contains(&vec![T, S, I, O].into()));
+        assert!(!pattern.contains(&vec![T, T, T, O].into()));
+    }
+
+    #[test]
+    fn can_accept_case3() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::One(T),
+            PatternElement::Permutation(vec![L, L, J, S, Z].into(), 2),
+        ]).unwrap();
+
+        // Success
+        assert!(pattern.contains(&vec![T, L, L].into()));
+        assert!(pattern.contains(&vec![T, L, J].into()));
+        assert!(pattern.contains(&vec![T, L, S].into()));
+        assert!(pattern.contains(&vec![T, L, Z].into()));
+        assert!(pattern.contains(&vec![T, J, L].into()));
+        assert!(pattern.contains(&vec![T, J, S].into()));
+        assert!(pattern.contains(&vec![T, J, Z].into()));
+        assert!(pattern.contains(&vec![T, S, L].into()));
+        assert!(pattern.contains(&vec![T, S, J].into()));
+        assert!(pattern.contains(&vec![T, S, Z].into()));
+        assert!(pattern.contains(&vec![T, Z, L].into()));
+        assert!(pattern.contains(&vec![T, Z, J].into()));
+        assert!(pattern.contains(&vec![T, Z, S].into()));
+
+        // Failure at One
+        assert!(!pattern.contains(&vec![O, L, L].into()));
+
+        // Failure at Permutation
+        assert!(!pattern.contains(&vec![T, O, J].into()));
+        assert!(!pattern.contains(&vec![T, J, J].into()));
     }
 }

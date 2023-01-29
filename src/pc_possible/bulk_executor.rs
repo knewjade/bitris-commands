@@ -91,7 +91,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// Make PcPossibleBulkExecutor.
     ///
     /// Returns `Err()` if the setting is incorrect or restricted.
-    /// See `PcPossibleBulkExecutorCreationError` for error patterns.
+    /// See `PcPossibleBulkExecutorCreationError` for error cases.
     /// ```
     /// use std::str::FromStr;
     /// use bitris::prelude::*;
