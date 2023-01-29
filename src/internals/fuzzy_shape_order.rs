@@ -66,6 +66,24 @@ impl FuzzyShapeOrder {
     }
 }
 
+impl From<Vec<FuzzyShape>> for FuzzyShapeOrder {
+    fn from(fuzzy_shapes: Vec<FuzzyShape>) -> Self {
+        Self::new(fuzzy_shapes)
+    }
+}
+
+impl From<&[FuzzyShape]> for FuzzyShapeOrder {
+    fn from(fuzzy_shapes: &[FuzzyShape]) -> Self {
+        Self::new(fuzzy_shapes.iter().map(|&fuzzy_shape| fuzzy_shape).collect())
+    }
+}
+
+impl FromIterator<FuzzyShape> for FuzzyShapeOrder {
+    fn from_iter<T: IntoIterator<Item=FuzzyShape>>(iter: T) -> Self {
+        Self::new(iter.into_iter().collect())
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
