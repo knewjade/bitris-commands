@@ -13,7 +13,7 @@ fn all_pcs(data: &AllPcsFromShapeCounterBenchmarkData) {
         move_rules, clipped_board, &data.shape_counters,
     ).unwrap();
     let result = executor.execute();
-    assert_eq!(result, data.expected);
+    assert_eq!(result.len(), data.expected);
 }
 
 #[derive(Debug)]
@@ -23,7 +23,7 @@ struct AllPcsFromShapeCounterBenchmarkData {
     height: u32,
     shape_counters: Vec<ShapeCounter>,
     allow_move: AllowMove,
-    expected: u64,
+    expected: usize,
 }
 
 fn bench_all_pcs_from_shape_counters(c: &mut Criterion) {

@@ -2,7 +2,7 @@ use bitris::prelude::*;
 use thiserror::Error;
 
 use crate::{ClippedBoard, ShapeCounter};
-use crate::all_pcs::Builder;
+use crate::all_pcs::{Builder, PcSolutions};
 
 /// A collection of errors that occur when making the executor.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -64,7 +64,7 @@ impl<'a, T: RotationSystem> AllPcsFromCounterBulkExecutor<'a, T> {
     }
 
     /// TODO desc Start the search for PC possible in bulk.
-    pub fn execute(&self) -> u64 {
+    pub fn execute(&self) -> PcSolutions {
         let max_shape_counter = self.shape_counters.iter()
             .fold(ShapeCounter::empty(), |prev, shape_counter| {
                 prev.merge_by_max(shape_counter)
@@ -103,7 +103,7 @@ mod tests {
             move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
-        assert_eq!(result, 1);
+        assert_eq!(result.len(), 1);
     }
 
     #[test]
@@ -124,7 +124,7 @@ mod tests {
             move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
-        assert_eq!(result, 79);
+        assert_eq!(result.len(), 79);
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod tests {
             move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
-        assert_eq!(result, 57);
+        assert_eq!(result.len(), 57);
     }
 
     #[test]
@@ -167,7 +167,7 @@ mod tests {
             move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
-        assert_eq!(result, 38);
+        assert_eq!(result.len(), 38);
     }
 
     #[test]
@@ -189,7 +189,7 @@ mod tests {
             move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
-        assert_eq!(result, 26);
+        assert_eq!(result.len(), 26);
     }
 
     #[test]
@@ -212,7 +212,7 @@ mod tests {
             move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
-        assert_eq!(result, 2);
+        assert_eq!(result.len(), 2);
     }
 
     #[test]
@@ -233,7 +233,7 @@ mod tests {
             move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
-        assert_eq!(result, 0);
+        assert_eq!(result.len(), 0);
     }
 
     #[test]

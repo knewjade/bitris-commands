@@ -6,6 +6,8 @@ use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes};
 
 trait PcAggregationChecker {
     fn checks(&self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) -> bool;
+
+    fn save(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>);
 }
 
 pub(crate) struct Aggregator {
@@ -14,6 +16,24 @@ pub(crate) struct Aggregator {
     nodes: Nodes,
     spawn_position: BlPosition,
     goal_board: Board64,
+}
+
+// TODO
+pub struct PcSolutions {
+    clipped_board: ClippedBoard,
+    placed_pieces: Vec<Vec<PlacedPiece>>,
+}
+
+impl PcSolutions {
+    #[inline]
+    pub fn empty(clipped_board: ClippedBoard) -> Self {
+        Self { clipped_board, placed_pieces: Vec::new() }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.placed_pieces.len()
+    }
 }
 
 impl Aggregator {
@@ -34,15 +54,16 @@ impl Aggregator {
         Self { clipped_board, map_placed_piece_blocks, nodes, spawn_position, goal_board }
     }
 
-    pub(crate) fn aggregate_with_shape_counters(&self, shape_counters: &Vec<ShapeCounter>) -> u64 {
+    pub(crate) fn aggregate_with_shape_counters(&self, shape_counters: &Vec<ShapeCounter>) -> PcSolutions {
         if self.nodes.indexes.is_empty() {
-            return 0;
+            return PcSolutions::empty(self.clipped_board);
         }
 
         struct PcAggregationCheckerImpl<'a> {
             shape_counters: &'a Vec<ShapeCounter>,
             clipped_board: ClippedBoard,
             spawn_position: BlPosition,
+            solutions: Vec<Vec<PlacedPiece>>,
         }
 
         impl PcAggregationChecker for PcAggregationCheckerImpl<'_> {
@@ -57,50 +78,50 @@ impl Aggregator {
                     return false;
                 }
 
-                let x = PlacedPieceBlocksFlow::find_one_stackable(
+                let succeed = PlacedPieceBlocksFlow::find_one_stackable(
                     self.clipped_board.board(),
                     placed_piece_blocks_vec.clone(),
                     MoveRules::default(),
                     self.spawn_position,
                 ).is_some();
-                // // TODO
-                // if !x {
-                //     let y = PlacedPieceBlocksFlow::find_one_placeable(
-                //         self.clipped_board.board(),
-                //         placed_piece_blocks_vec.clone(),
-                //     ).is_some();
-                //     if !y {
-                //         println!("SKIP");
-                //         let x1: Vec<PlacedPiece> = placed_piece_blocks_vec.iter().map(|it| it.placed_piece).collect();
-                //         dbg!(x1);
-                //     }
-                // }
-                x
+                if !succeed {
+                    return false;
+                }
+
+                true
+            }
+
+            fn save(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) {
+                self.solutions.push(placed_piece_blocks_vec.iter().map(|it| it.placed_piece).collect())
             }
         }
 
-        let checker = PcAggregationCheckerImpl {
+        let mut checker = PcAggregationCheckerImpl {
             shape_counters,
             clipped_board: self.clipped_board,
             spawn_position: self.spawn_position,
+            solutions: Vec::new(),
         };
 
         let mut results = Vec::with_capacity((self.clipped_board.spaces() / 4) as usize);
-        self.aggregate_recursively(self.nodes.head_index_id().unwrap(), &mut results, &checker)
+        self.aggregate_recursively(self.nodes.head_index_id().unwrap(), &mut results, &mut checker);
+        PcSolutions {
+            clipped_board: self.clipped_board,
+            placed_pieces: checker.solutions,
+        }
     }
 
     fn aggregate_recursively<'a>(
         &'a self,
         index_id: IndexId,
         placed_pieces: &mut Vec<&'a PlacedPieceBlocks>,
-        checker: &'a impl PcAggregationChecker,
-    ) -> u64 {
+        checker: &mut impl PcAggregationChecker,
+    ) {
         match self.nodes.index(index_id).unwrap() {
             IndexNode::ToItem(next_item_id, item_length) => {
                 let item_ids = (next_item_id.id..(next_item_id.id + *item_length as usize))
                     .map(|item_id| self.nodes.item(ItemId::new(item_id)).unwrap());
 
-                let mut success = 0u64;
                 for item in item_ids {
                     let current = &self.map_placed_piece_blocks[&item.placed_piece];
 
@@ -124,13 +145,9 @@ impl Aggregator {
                     }
 
                     placed_pieces.insert(inserted, current);
-
-                    success += self.aggregate_recursively(item.next_index_id, placed_pieces, checker);
-
+                    self.aggregate_recursively(item.next_index_id, placed_pieces, checker);
                     placed_pieces.remove(inserted);
                 }
-
-                success
             }
             IndexNode::ToNextIndex(next_index_id) => {
                 self.aggregate_recursively(*next_index_id, placed_pieces, checker)
@@ -163,13 +180,11 @@ impl Aggregator {
                     }
                 }
 
-                if ok {
-                    if checker.checks(placed_pieces) { 1 } else { 0 }
-                } else {
-                    0
+                if ok && checker.checks(placed_pieces) {
+                    checker.save(placed_pieces);
                 }
             }
-            IndexNode::Abort => { 0 }
+            IndexNode::Abort => {}
         }
     }
 }
