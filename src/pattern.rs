@@ -259,7 +259,7 @@ impl Pattern {
 
     /// The number of elements in one shapes.
     pub fn dim_shapes(&self) -> usize {
-        assert!(!self.elements.is_empty(), "The pattern do not have shapes.");
+        debug_assert!(!self.elements.is_empty(), "The pattern do not have shapes.");
         self.elements.iter()
             .map(|it| it.dim_shapes())
             .fold(0, |sum, it| sum + it)
@@ -397,6 +397,130 @@ impl Pattern {
         true
     }
 }
+
+//
+// // TODO desc
+// #[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
+// pub struct PatternCursor<'a> {
+//     sequence: &'a Pattern,
+//     head: usize,
+//     next: usize,
+// }
+//
+// impl<'a> OrderCursor<'a> {
+//     #[inline]
+//     fn new(sequence: &'a ShapeOrder) -> Self {
+//         if 0 < sequence.shapes.len() {
+//             Self { sequence, head: Some(0), tails: 1 }
+//         } else {
+//             Self { sequence, head: None, tails: 0 }
+//         }
+//     }
+//
+//     /// Returns `true` if a pop-able shape exists next.
+//     #[inline]
+//     pub fn has_next(&self) -> bool {
+//         self.head.is_some()
+//     }
+//
+//     /// Returns the count of shapes not used.
+//     #[inline]
+//     pub fn len_unused(&self) -> usize {
+//         self.sequence.shapes.len() - self.tails + self.head.and(Some(1)).unwrap_or(0)
+//     }
+//
+//     /// Returns shapes that have not been used as an order.
+//     #[inline]
+//     pub fn unused_shapes(&self) -> ShapeOrder {
+//         ShapeOrder::new(if let Some(first) = self.head {
+//             let shapes = &self.sequence.shapes;
+//             let n = [shapes[first]];
+//             let x = &shapes[self.tails..shapes.len()];
+//             n.into_iter().chain(x.into_iter().map(|it| *it)).collect_vec()
+//         } else {
+//             Vec::new()
+//         })
+//     }
+//
+//     /// Returns a popped shape and a next cursor.
+//     /// If nothing that can be popped next, None is returned for the shape.
+//     /// The next cursor is always returned as available.
+//     ///
+//     /// The shape returned by the first is that received before the second.
+//     /// Therefore, this function ensures the following behaviors.
+//     ///
+//     /// * If the first returns None, the second is always None.
+//     ///   The last shape is always assigned to the first.
+//     ///
+//     /// * If only the first is used, it's equivalent to consuming from the head of the order.
+//     ///   In other words, equivalent to not using a hold.
+//     ///   Note, however, this means that "The second is not always the hold because the last one is assigned to the first, regardless of the hold".
+//     #[inline]
+//     pub fn pop(&self, op: PopOp) -> (Option<Shape>, OrderCursor) {
+//         return match op {
+//             PopOp::First => {
+//                 return if let Some(head) = self.head {
+//                     let freeze = if self.tails < self.sequence.shapes.len() {
+//                         // The tails exist
+//                         OrderCursor {
+//                             sequence: self.sequence,
+//                             head: Some(self.tails),
+//                             tails: self.tails + 1,
+//                         }
+//                     } else {
+//                         // The tails don't exist: It's the last
+//                         OrderCursor {
+//                             sequence: self.sequence,
+//                             head: None,
+//                             tails: self.tails,
+//                         }
+//                     };
+//                     (Some(self.sequence.shapes[head]), freeze)
+//                 } else {
+//                     (None, *self)
+//                 };
+//             }
+//             PopOp::Second => {
+//                 if self.tails < self.sequence.shapes.len() {
+//                     let freeze = OrderCursor {
+//                         sequence: self.sequence,
+//                         head: self.head,
+//                         tails: self.tails + 1,
+//                     };
+//                     return (Some(self.sequence.shapes[self.tails]), freeze);
+//                 }
+//
+//                 (None, *self)
+//             }
+//         };
+//     }
+//
+//     /// Returns the first shape.
+//     #[inline]
+//     pub fn peek(&self, op: PopOp) -> Option<Shape> {
+//         match op {
+//             PopOp::First => self.first(),
+//             PopOp::Second => self.second(),
+//         }
+//     }
+//
+//     /// Returns the first shape.
+//     #[inline]
+//     pub fn first(&self) -> Option<Shape> {
+//         self.head.map(|index| self.sequence.shapes[index])
+//     }
+//
+//     /// Returns the second shape.
+//     #[inline]
+//     pub fn second(&self) -> Option<Shape> {
+//         if self.tails < self.sequence.shapes.len() {
+//             Some(self.sequence.shapes[self.tails])
+//         } else {
+//             None
+//         }
+//     }
+// }
+
 
 
 #[cfg(test)]

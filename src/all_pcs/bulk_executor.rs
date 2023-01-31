@@ -1,7 +1,7 @@
 use bitris::prelude::*;
 use thiserror::Error;
 
-use crate::{ClippedBoard, ShapeCounter};
+use crate::{ClippedBoard, Pattern, ShapeCounter};
 use crate::all_pcs::{Builder, PcSolutions};
 
 /// A collection of errors that occur when making the executor.
@@ -47,6 +47,7 @@ impl<'a, T: RotationSystem> AllPcsFromCounterBulkExecutor<'a, T> {
             return Err(CountersAreEmpty);
         }
 
+        // TODO allにする
         let max_dimension = shape_counters.iter()
             .map(|shape_counter| shape_counter.len())
             .max()
@@ -77,6 +78,71 @@ impl<'a, T: RotationSystem> AllPcsFromCounterBulkExecutor<'a, T> {
     }
 }
 
+/// A collection of errors that occur when making the executor.
+#[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum AllPcsFromPatterExecutorBulkCreationError {
+    #[error("Unexpected the count of board spaces.")]
+    UnexpectedBoardSpaces,
+    #[error("The pattern is too short to take a PC.")]
+    ShortPatternDimension,
+    #[error("Board height exceeds the upper limit. Up to 56 are supported.")]
+    BoardIsTooHigh,
+}
+
+/// The executor to find PC possibles.
+#[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
+pub struct AllPcsFromPatternBulkExecutor<'a, T: RotationSystem> {
+    move_rules: MoveRules<'a, T>,
+    clipped_board: ClippedBoard,
+    pattern: &'a Pattern,
+    spawn_position: BlPosition,
+}
+
+impl<'a, T: RotationSystem> AllPcsFromPatternBulkExecutor<'a, T> {
+    // TODO desc
+    pub fn try_new(
+        move_rules: MoveRules<'a, T>,
+        clipped_board: ClippedBoard,
+        pattern: &'a Pattern,
+    ) -> Result<Self, AllPcsFromPatterExecutorBulkCreationError> {
+        use AllPcsFromPatterExecutorBulkCreationError::*;
+
+        if 20 < clipped_board.height() {
+            return Err(BoardIsTooHigh);
+        }
+
+        if clipped_board.spaces() % 4 != 0 {
+            return Err(UnexpectedBoardSpaces);
+        }
+
+        let dimension = pattern.dim_shapes() as u32;
+        if dimension < clipped_board.spaces() / 4 {
+            return Err(ShortPatternDimension);
+        }
+
+        debug_assert!(0 < clipped_board.spaces());
+
+        // Spawn over the top of the well to avoid getting stuck.
+        let spawn_position = bl(5, clipped_board.height() as i32 + 4);
+
+        Ok(Self { move_rules, clipped_board, pattern, spawn_position })
+    }
+
+    /// TODO desc Start the search for PC possible in bulk.
+    pub fn execute(&self) -> PcSolutions {
+        let shape_counters = self.pattern.to_shape_counter_vec();
+        let max_shape_counter = shape_counters.iter()
+            .fold(ShapeCounter::empty(), |prev, shape_counter| {
+                prev.merge_by_max(shape_counter)
+            });
+
+        let aggregator = Builder::new(self.clipped_board, max_shape_counter, 10)
+            .to_aggregator(self.spawn_position);
+
+        aggregator.aggregate_with_shape_counters(&shape_counters)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -84,8 +150,8 @@ mod tests {
 
     use bitris::prelude::*;
 
-    use crate::{ClippedBoard, ShapeCounter};
-    use crate::all_pcs::{AllPcsFromCounterBulkExecutor, AllPcsFromCounterExecutorBulkCreationError};
+    use crate::{ClippedBoard, PatternElement, ShapeCounter};
+    use crate::all_pcs::{AllPcsFromCounterBulkExecutor, AllPcsFromCounterExecutorBulkCreationError, AllPcsFromPatternBulkExecutor};
 
     #[test]
     fn small_test_case() {
@@ -285,5 +351,68 @@ mod tests {
             AllPcsFromCounterBulkExecutor::try_new(move_rules, clipped_board, &shape_counters).unwrap_err(),
             AllPcsFromCounterExecutorBulkCreationError::BoardIsTooHigh,
         );
+    }
+
+    #[test]
+    fn small_test_case_pattern() {
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
+        let board = Board64::from_str(
+            "
+            #..#######
+            #..#######
+        ").unwrap();
+        let clipped_board = ClippedBoard::try_new(board, 2).unwrap();
+        let pattern = vec![
+            PatternElement::One(Shape::O),
+        ].try_into().unwrap();
+        let executor = AllPcsFromPatternBulkExecutor::try_new(
+            move_rules, clipped_board, &pattern,
+        ).unwrap();
+        let result = executor.execute();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn small_test_case_pattern2() {
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
+        let board = Board64::from_str("
+            #######...
+            ########.#
+            #..#######
+            #..#######
+        ").unwrap();
+        let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+
+        {
+            let pattern = vec![
+                PatternElement::Fixed(vec![Shape::O, Shape::T].try_into().unwrap()),
+            ].try_into().unwrap();
+            let executor = AllPcsFromPatternBulkExecutor::try_new(
+                move_rules, clipped_board, &pattern,
+            ).unwrap();
+            let result = executor.execute();
+            assert_eq!(result.len(), 0);
+        }
+    }
+
+    #[test]
+    fn pco_with_i() {
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
+        let board = Board64::from_str("
+            ###.....##
+            ###....###
+            ###...####
+            ###....###
+        ").unwrap();
+        let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+        let pattern = vec![
+            PatternElement::One(Shape::I),
+            PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
+        ].try_into().unwrap();
+        let executor = AllPcsFromPatternBulkExecutor::try_new(
+            move_rules, clipped_board, &pattern,
+        ).unwrap();
+        let result = executor.execute();
+        assert_eq!(result.len(), 63);
     }
 }

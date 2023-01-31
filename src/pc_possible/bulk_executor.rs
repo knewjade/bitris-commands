@@ -2,7 +2,7 @@ use bitris::prelude::*;
 use fxhash::FxHashSet;
 use thiserror::Error;
 
-use crate::{ClippedBoard, ForEachVisitor, OrderCursor, Pattern, PopOp, ShapeOrder, ShapeSequence};
+use crate::{ClippedBoard, ForEachVisitor, Pattern, ShapeOrder, ShapeSequence};
 use crate::internals::{FuzzyShape, FuzzyShapeOrder};
 use crate::pc_possible::{Buffer, ExecuteInstruction, PcResults, VerticalParity};
 use crate::pc_possible::bulk_executor::ExecuteInstruction::Continue;
@@ -259,7 +259,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         visited_states: &mut FxHashSet::<SearchingState>,
     ) -> Option<ShapeSequence> {
         let cursor = order.new_cursor();
-        let mut buffer = Buffer::with_resized(cursor.len_unused());
+        let mut buffer = Buffer::with_resized(cursor.len_remaining());
         let parity = VerticalParity::new(current_clipped_board);
 
         self.pop_shape(cursor, current_clipped_board, visited_states, &mut buffer, &parity)
@@ -267,14 +267,14 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 
     fn pop_shape(
         &self,
-        cursor: OrderCursor,
+        cursor: OrderCursor<Shape>,
         clipped_board: ClippedBoard,
         visited_states: &mut FxHashSet::<SearchingState>,
         buffer: &mut Buffer,
         parity: &VerticalParity,
     ) -> Option<ShapeSequence> {
         let (popped, next_cursor) = cursor.pop(PopOp::First);
-        if let Some(shape) = popped {
+        if let Some(&shape) = popped {
             if let Some(order) = self.increment(shape, clipped_board, next_cursor, visited_states, buffer, parity) {
                 return Some(order);
             }
@@ -284,7 +284,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
 
         if self.allows_hold {
             let (popped, next_cursor) = cursor.pop(PopOp::Second);
-            if let Some(shape) = popped {
+            if let Some(&shape) = popped {
                 if let Some(order) = self.increment(shape, clipped_board, next_cursor, visited_states, buffer, parity) {
                     return Some(order);
                 }
@@ -298,7 +298,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         &self,
         shape: Shape,
         clipped_board: ClippedBoard,
-        next_cursor: OrderCursor,
+        next_cursor: OrderCursor<Shape>,
         visited_states: &mut FxHashSet::<SearchingState>,
         buffer: &mut Buffer,
         parity: &VerticalParity,
@@ -323,7 +323,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
             if !visited_states.insert(SearchingState {
                 board,
                 height,
-                first: next_cursor.first(),
+                first: next_cursor.first().map(|&shape| shape),
             }) {
                 continue;
             }
@@ -333,11 +333,10 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
                 continue;
             }
 
-            let shape_order = next_cursor.unused_shapes();
-            let rest_shapes = shape_order.shapes();
+            let remaining_shapes: Vec<Shape> = next_cursor.iter_remaining().map(|&shape| shape).collect();
             let next_parity = parity.place(placement);
             // The flag is off if the hold is enabled but does not have an extra piece (because parity is not affected by the shape order)
-            if !next_parity.validates(rest_shapes, 0, self.allows_hold && self.has_extra_shapes) {
+            if !next_parity.validates(remaining_shapes.as_slice(), 0, self.allows_hold && self.has_extra_shapes) {
                 continue;
             }
 
