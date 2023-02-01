@@ -1,7 +1,7 @@
 use bitris::prelude::Shape;
 
-use crate::{ForEachVisitor, ShapeOrder};
 use crate::internals::fuzzy_shape::FuzzyShape;
+use crate::ShapeOrder;
 
 /// Represents an order of shapes that includes fuzzy.
 /// "Order" means affected by the hold operation.
@@ -20,27 +20,20 @@ impl FuzzyShapeOrder {
     /// Expand unknown shapes to the order assumed as the shape of each.
     #[allow(dead_code)]
     fn expand_as_wildcard(&self) -> Vec<ShapeOrder> {
-        struct Visitor {
-            out: Vec<ShapeOrder>,
-        }
-
-        impl ForEachVisitor<[Shape]> for Visitor {
-            fn visit(&mut self, shapes: &[Shape]) {
-                self.out.push(ShapeOrder::new(shapes.to_vec()));
-            }
-        }
-
-        let mut visitor = Visitor { out: Vec::new() };
-        self.expand_as_wildcard_walk(&mut visitor);
-        visitor.out
+        let mut out = Vec::<ShapeOrder>::new();
+        self.expand_as_wildcard_walk(&mut |shapes| {
+            out.push(ShapeOrder::new(shapes.to_vec()));
+        });
+        out
     }
 
     /// See `expand_as_wildcard()` for details.
-    pub(crate) fn expand_as_wildcard_walk(&self, visitor: &mut impl ForEachVisitor<[Shape]>) {
-        fn build(shapes: &Vec<FuzzyShape>, buffer: &mut Vec<Shape>, visitor: &mut impl ForEachVisitor<[Shape]>) {
+    pub(crate) fn expand_as_wildcard_walk(&self, visitor: &mut impl FnMut(&[Shape])) {
+        fn build(shapes: &Vec<FuzzyShape>, buffer: &mut Vec<Shape>, visitor: &mut impl FnMut(&[Shape])) {
             let index = buffer.len();
             if shapes.len() <= index {
-                visitor.visit(buffer.as_slice());
+                let x: &[Shape] = buffer.as_slice();
+                visitor(x);
                 return;
             }
 

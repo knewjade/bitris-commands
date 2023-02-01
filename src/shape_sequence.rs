@@ -2,7 +2,7 @@ use std::vec::IntoIter;
 
 use bitris::prelude::*;
 
-use crate::{BitShapes, ForEachVisitor, ShapeOrder};
+use crate::{BitShapes, ShapeOrder};
 use crate::internal_macros::forward_impl_from;
 use crate::internals::{FuzzyShape, FuzzyShapeOrder};
 
@@ -53,24 +53,16 @@ impl ShapeSequence {
             )];
         }
 
-        pub struct FuzzyOrderVecAggregator {
-            orders: Vec<FuzzyShapeOrder>,
-        }
-
-        impl ForEachVisitor<[FuzzyShape]> for FuzzyOrderVecAggregator {
-            fn visit(&mut self, fuzzy_shapes: &[FuzzyShape]) {
-                self.orders.push(FuzzyShapeOrder::new(fuzzy_shapes.to_vec()));
-            }
-        }
-
-        let mut visitor = FuzzyOrderVecAggregator { orders: Vec::new() };
-        self.infer_input_walk(infer_size, &mut visitor);
-        visitor.orders
+        let mut orders = Vec::<FuzzyShapeOrder>::new();
+        self.infer_input_walk(infer_size, &mut |fuzzy_shapes| {
+            orders.push(FuzzyShapeOrder::new(fuzzy_shapes.to_vec()));
+        });
+        orders
     }
 
     /// See `infer_input()` for details.
-    pub(crate) fn infer_input_walk(&self, infer_size: usize, visitor: &mut impl ForEachVisitor<[FuzzyShape]>) {
-        fn rec<'a>(shapes: &Vec<Shape>, visitor: &mut impl ForEachVisitor<[FuzzyShape]>, buffer: &'a mut Vec<FuzzyShape>, from: usize, depth: usize, stock_index: usize) {
+    pub(crate) fn infer_input_walk(&self, infer_size: usize, visitor: &mut impl FnMut(&[FuzzyShape])) {
+        fn rec(shapes: &Vec<Shape>, visitor: &mut impl FnMut(&[FuzzyShape]), buffer: &mut Vec<FuzzyShape>, from: usize, depth: usize, stock_index: usize) {
             use FuzzyShape::*;
 
             let to = shapes.len();
@@ -93,7 +85,7 @@ impl ShapeSequence {
                 if depth < from - 1 {
                     rec(shapes, visitor, buffer, from, depth + 1, depth + 1);
                 } else {
-                    visitor.visit(buffer.as_slice());
+                    visitor(buffer.as_slice());
                 }
                 buffer[stock_index] = Unknown;
             }

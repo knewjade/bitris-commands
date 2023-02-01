@@ -2,7 +2,7 @@ use bitris::prelude::Shape;
 use itertools::{Itertools, repeat_n};
 use thiserror::Error;
 
-use crate::{ForEachVisitor, ShapeCounter, ShapeOrder, ShapeSequence};
+use crate::{ShapeCounter, ShapeOrder, ShapeSequence};
 use crate::bit_shapes::BitShapes;
 
 /// Calculate the count of permutations.
@@ -170,14 +170,14 @@ impl Pattern {
     }
 
     #[allow(dead_code)]
-    fn walk_shapes(&self, visitor: &mut impl ForEachVisitor<Vec<Shape>>) {
+    fn walk_shapes_walk(&self, visitor: &mut impl FnMut(&[Shape])) {
         struct Buffer<'a> {
             all_vec: &'a Vec<Vec<Vec<Shape>>>,
             buffer: Vec<Shape>,
         }
 
         impl Buffer<'_> {
-            fn build(&mut self, index: usize, visitor: &mut impl ForEachVisitor<Vec<Shape>>) {
+            fn build(&mut self, index: usize, visitor: &mut impl FnMut(&[Shape])) {
                 if index < self.all_vec.len() - 1 {
                     for shapes in &self.all_vec[index] {
                         let size = self.buffer.len();
@@ -189,7 +189,7 @@ impl Pattern {
                     for shapes in &self.all_vec[index] {
                         let size = self.buffer.len();
                         self.buffer.extend(shapes.iter());
-                        visitor.visit(&self.buffer);
+                        visitor(&self.buffer.as_slice());
                         self.buffer.resize(size, Shape::T);
                     }
                 }
@@ -215,22 +215,11 @@ impl Pattern {
             return Vec::new();
         }
 
-        struct Aggregator {
-            out: Vec<Vec<Shape>>,
-        }
-
-        impl ForEachVisitor<Vec<Shape>> for Aggregator {
-            fn visit(&mut self, shapes: &Vec<Shape>) {
-                self.out.push(shapes.clone());
-            }
-        }
-
-        let capacity = self.len_shapes_vec();
-        let mut visitor = Aggregator { out: Vec::with_capacity(capacity) };
-
-        self.walk_shapes(&mut visitor);
-
-        visitor.out
+        let mut vec = Vec::with_capacity(self.len_shapes_vec());
+        self.walk_shapes_walk(&mut |shapes| {
+            vec.push(shapes.iter().map(|&shape| shape).collect());
+        });
+        vec
     }
 
     /// Returns all sequences represented by the pattern.
@@ -266,20 +255,20 @@ impl Pattern {
     }
 
     #[allow(dead_code)]
-    fn walk_shape_counters(&self, visitor: &mut impl ForEachVisitor<ShapeCounter>) {
+    fn shape_counters_walk(&self, visitor: &mut impl FnMut(ShapeCounter)) {
         struct Buffer<'a> {
             all_vec: &'a Vec<Vec<ShapeCounter>>,
         }
 
         impl Buffer<'_> {
-            fn build(&mut self, index: usize, buffer: ShapeCounter, visitor: &mut impl ForEachVisitor<ShapeCounter>) {
+            fn build(&mut self, index: usize, buffer: ShapeCounter, visitor: &mut impl FnMut(ShapeCounter)) {
                 if index < self.all_vec.len() - 1 {
                     for shapes in &self.all_vec[index] {
                         self.build(index + 1, buffer + shapes, visitor);
                     }
                 } else {
                     for shapes in &self.all_vec[index] {
-                        visitor.visit(&(buffer + shapes));
+                        visitor(buffer + shapes);
                     }
                 }
             }
@@ -303,21 +292,11 @@ impl Pattern {
             return Vec::new();
         }
 
-        struct Aggregator {
-            out: Vec<ShapeCounter>,
-        }
-
-        impl ForEachVisitor<ShapeCounter> for Aggregator {
-            fn visit(&mut self, shape_counters: &ShapeCounter) {
-                self.out.push(shape_counters.clone());
-            }
-        }
-
-        let mut visitor = Aggregator { out: Vec::new() };
-
-        self.walk_shape_counters(&mut visitor);
-
-        visitor.out
+        let mut vec = Vec::<ShapeCounter>::new();
+        self.shape_counters_walk(&mut |shape_counter| {
+            vec.push(shape_counter);
+        });
+        vec
     }
 
     /// Returns true if a shape sequence is represented by pattern.
@@ -520,7 +499,6 @@ impl Pattern {
 //         }
 //     }
 // }
-
 
 
 #[cfg(test)]

@@ -2,31 +2,10 @@ use bitris::prelude::*;
 use fxhash::FxHashSet;
 use thiserror::Error;
 
-use crate::{ClippedBoard, ForEachVisitor, Pattern, ShapeOrder, ShapeSequence};
-use crate::internals::{FuzzyShape, FuzzyShapeOrder};
+use crate::{ClippedBoard, Pattern, ShapeOrder, ShapeSequence};
+use crate::internals::FuzzyShapeOrder;
 use crate::pc_possible::{Buffer, ExecuteInstruction, PcResults, VerticalParity};
 use crate::pc_possible::bulk_executor::ExecuteInstruction::Continue;
-
-struct Visitor<'a> {
-    result: &'a mut PcResults,
-}
-
-impl<'a> ForEachVisitor<[FuzzyShape]> for Visitor<'a> {
-    #[inline]
-    fn visit(&mut self, fuzzy_shapes: &[FuzzyShape]) {
-        let fuzzy_shape_order = FuzzyShapeOrder::new(fuzzy_shapes.to_vec());
-        fuzzy_shape_order.expand_as_wildcard_walk(self);
-    }
-}
-
-impl<'a> ForEachVisitor<[Shape]> for Visitor<'a> {
-    #[inline]
-    fn visit(&mut self, shapes: &[Shape]) {
-        let order = ShapeSequence::new(shapes.to_vec());
-        self.result.accept_if_present(&order, true);
-    }
-}
-
 
 /// Dataset for detecting the same state during PC possible search.
 /// The block counts and height on the board can determine the search depth. (Placed pieces will change the block counts.)
@@ -226,8 +205,13 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
                 results.accept_if_present(&sequence, true);
 
                 if self.allows_hold {
-                    let mut visitor = Visitor { result: &mut results };
-                    sequence_pc.infer_input_walk(infer_size, &mut visitor);
+                    sequence_pc.infer_input_walk(infer_size, &mut |fuzzy_shapes| {
+                        let fuzzy_shape_order = FuzzyShapeOrder::new(fuzzy_shapes.to_vec());
+                        fuzzy_shape_order.expand_as_wildcard_walk(&mut |shapes| {
+                            let order = ShapeSequence::new(shapes.to_vec());
+                            results.accept_if_present(&order, true);
+                        });
+                    });
                 }
             } else {
                 results.accept_if_present(&sequence, false);
@@ -256,7 +240,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         &self,
         current_clipped_board: ClippedBoard,
         order: ShapeOrder,
-        visited_states: &mut FxHashSet::<SearchingState>,
+        visited_states: &mut FxHashSet<SearchingState>,
     ) -> Option<ShapeSequence> {
         let cursor = order.new_cursor();
         let mut buffer = Buffer::with_resized(cursor.len_remaining());
@@ -269,7 +253,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         &self,
         cursor: OrderCursor<Shape>,
         clipped_board: ClippedBoard,
-        visited_states: &mut FxHashSet::<SearchingState>,
+        visited_states: &mut FxHashSet<SearchingState>,
         buffer: &mut Buffer,
         parity: &VerticalParity,
     ) -> Option<ShapeSequence> {
@@ -299,7 +283,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         shape: Shape,
         clipped_board: ClippedBoard,
         next_cursor: OrderCursor<Shape>,
-        visited_states: &mut FxHashSet::<SearchingState>,
+        visited_states: &mut FxHashSet<SearchingState>,
         buffer: &mut Buffer,
         parity: &VerticalParity,
     ) -> Option<ShapeSequence> {
