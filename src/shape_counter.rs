@@ -212,6 +212,18 @@ impl ShapeCounter {
     /// ```
     /// use bitris_commands::prelude::*;
     /// use Shape::*;
+    /// let shape_counter = ShapeCounter::from(vec![T, I, O]);
+    /// assert!(shape_counter.contains(T));
+    /// assert!(!shape_counter.contains(S));
+    /// ```
+    pub fn contains(&self, shape: Shape) -> bool {
+        0 < self.counters[shape as usize]
+    }
+
+    /// Returns true when it has all the other's shapes.
+    /// ```
+    /// use bitris_commands::prelude::*;
+    /// use Shape::*;
     /// assert!(ShapeCounter::from(vec![T, T, S]).contains_all(&ShapeCounter::from(vec![])));
     /// assert!(ShapeCounter::from(vec![T, T, S]).contains_all(&ShapeCounter::from(vec![T, S])));
     /// assert!(ShapeCounter::from(vec![T, T, S]).contains_all(&ShapeCounter::from(vec![T, T, S])));

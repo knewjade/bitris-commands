@@ -40,11 +40,12 @@ pub enum PatternElement {
 impl PatternElement {
     /// Returns all `Vec<Shape>`s represented by the element.
     pub fn to_shapes_vec(&self) -> Vec<Vec<Shape>> {
-        match *self {
-            PatternElement::One(shape) => vec![vec![shape]],
+        match self {
+            PatternElement::One(shape) => vec![vec![*shape]],
             PatternElement::Fixed(shapes) => vec![shapes.to_vec()],
             PatternElement::Wildcard => Shape::all_iter().map(|it| vec![it]).collect(),
             PatternElement::Permutation(counter, pop) => {
+                let pop = *pop;
                 assert!(0 < pop && pop <= counter.len());
                 counter.to_pairs().into_iter()
                     .flat_map(|(shape, count)| { repeat_n(shape, count as usize).into_iter() })
@@ -62,12 +63,13 @@ impl PatternElement {
     }
 
     /// The count of shapes the pattern has.
-    pub fn len_shapes(&self) -> usize {
-        match *self {
+    pub fn count_shapes(&self) -> usize {
+        match self {
             PatternElement::One(_) => 1,
             PatternElement::Fixed(_) => 1,
             PatternElement::Wildcard => 7,
             PatternElement::Permutation(counter, pop) => {
+                let pop = *pop;
                 assert!(0 < pop && pop <= counter.len());
                 calculate_permutation_size(counter.len(), pop)
             }
@@ -242,7 +244,7 @@ impl Pattern {
             return 0;
         }
         self.elements.iter()
-            .map(|it| it.len_shapes())
+            .map(|it| it.count_shapes())
             .fold(1, |sum, it| sum * it)
     }
 
@@ -375,130 +377,165 @@ impl Pattern {
         }
         true
     }
+
+    /// Returns a matcher that determines whether a sequence of the shapes is contained in the pattern.
+    pub fn new_matcher(&self) -> ShapeMatcher {
+        self.into()
+    }
 }
 
-//
-// // TODO desc
-// #[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
-// pub struct PatternCursor<'a> {
-//     sequence: &'a Pattern,
-//     head: usize,
-//     next: usize,
-// }
-//
-// impl<'a> OrderCursor<'a> {
-//     #[inline]
-//     fn new(sequence: &'a ShapeOrder) -> Self {
-//         if 0 < sequence.shapes.len() {
-//             Self { sequence, head: Some(0), tails: 1 }
-//         } else {
-//             Self { sequence, head: None, tails: 0 }
-//         }
-//     }
-//
-//     /// Returns `true` if a pop-able shape exists next.
-//     #[inline]
-//     pub fn has_next(&self) -> bool {
-//         self.head.is_some()
-//     }
-//
-//     /// Returns the count of shapes not used.
-//     #[inline]
-//     pub fn len_unused(&self) -> usize {
-//         self.sequence.shapes.len() - self.tails + self.head.and(Some(1)).unwrap_or(0)
-//     }
-//
-//     /// Returns shapes that have not been used as an order.
-//     #[inline]
-//     pub fn unused_shapes(&self) -> ShapeOrder {
-//         ShapeOrder::new(if let Some(first) = self.head {
-//             let shapes = &self.sequence.shapes;
-//             let n = [shapes[first]];
-//             let x = &shapes[self.tails..shapes.len()];
-//             n.into_iter().chain(x.into_iter().map(|it| *it)).collect_vec()
-//         } else {
-//             Vec::new()
-//         })
-//     }
-//
-//     /// Returns a popped shape and a next cursor.
-//     /// If nothing that can be popped next, None is returned for the shape.
-//     /// The next cursor is always returned as available.
-//     ///
-//     /// The shape returned by the first is that received before the second.
-//     /// Therefore, this function ensures the following behaviors.
-//     ///
-//     /// * If the first returns None, the second is always None.
-//     ///   The last shape is always assigned to the first.
-//     ///
-//     /// * If only the first is used, it's equivalent to consuming from the head of the order.
-//     ///   In other words, equivalent to not using a hold.
-//     ///   Note, however, this means that "The second is not always the hold because the last one is assigned to the first, regardless of the hold".
-//     #[inline]
-//     pub fn pop(&self, op: PopOp) -> (Option<Shape>, OrderCursor) {
-//         return match op {
-//             PopOp::First => {
-//                 return if let Some(head) = self.head {
-//                     let freeze = if self.tails < self.sequence.shapes.len() {
-//                         // The tails exist
-//                         OrderCursor {
-//                             sequence: self.sequence,
-//                             head: Some(self.tails),
-//                             tails: self.tails + 1,
-//                         }
-//                     } else {
-//                         // The tails don't exist: It's the last
-//                         OrderCursor {
-//                             sequence: self.sequence,
-//                             head: None,
-//                             tails: self.tails,
-//                         }
-//                     };
-//                     (Some(self.sequence.shapes[head]), freeze)
-//                 } else {
-//                     (None, *self)
-//                 };
-//             }
-//             PopOp::Second => {
-//                 if self.tails < self.sequence.shapes.len() {
-//                     let freeze = OrderCursor {
-//                         sequence: self.sequence,
-//                         head: self.head,
-//                         tails: self.tails + 1,
-//                     };
-//                     return (Some(self.sequence.shapes[self.tails]), freeze);
-//                 }
-//
-//                 (None, *self)
-//             }
-//         };
-//     }
-//
-//     /// Returns the first shape.
-//     #[inline]
-//     pub fn peek(&self, op: PopOp) -> Option<Shape> {
-//         match op {
-//             PopOp::First => self.first(),
-//             PopOp::Second => self.second(),
-//         }
-//     }
-//
-//     /// Returns the first shape.
-//     #[inline]
-//     pub fn first(&self) -> Option<Shape> {
-//         self.head.map(|index| self.sequence.shapes[index])
-//     }
-//
-//     /// Returns the second shape.
-//     #[inline]
-//     pub fn second(&self) -> Option<Shape> {
-//         if self.tails < self.sequence.shapes.len() {
-//             Some(self.sequence.shapes[self.tails])
-//         } else {
-//             None
-//         }
-//     }
-// }
+/// Determines if a sequence of shapes matches a pattern element.
+#[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
+struct ShapeMatcherBuffer {
+    used: ShapeCounter,
+    counter: usize,
+}
+
+impl ShapeMatcherBuffer {
+    #[inline]
+    fn empty() -> Self {
+        Self { used: ShapeCounter::empty(), counter: 0 }
+    }
+
+    fn match_shape(self, element: &PatternElement, target: Shape) -> (bool, Option<Self>) {
+        #[inline]
+        fn new_next_matcher(
+            buffer: ShapeMatcherBuffer,
+            element_dim_shapes: usize,
+            target: Shape,
+        ) -> Option<ShapeMatcherBuffer> {
+            if buffer.counter + 1 < element_dim_shapes {
+                Some(ShapeMatcherBuffer {
+                    used: buffer.used + target,
+                    counter: buffer.counter + 1,
+                })
+            } else {
+                None
+            }
+        }
+
+        match element {
+            PatternElement::One(shape) => (target == *shape, None),
+            PatternElement::Fixed(shapes) => {
+                match shapes.get(self.counter) {
+                    None => (false, None),
+                    Some(shape) => {
+                        if target == shape {
+                            (true, new_next_matcher(self, shapes.len(), target))
+                        } else {
+                            (false, None)
+                        }
+                    }
+                }
+            }
+            PatternElement::Wildcard => (true, None),
+            PatternElement::Permutation(shape_counter, pop) => {
+                let remaining = shape_counter - self.used;
+                if remaining.contains(target) {
+                    (true, new_next_matcher(self, *pop, target))
+                } else {
+                    (false, None)
+                }
+            }
+            PatternElement::Factorial(shape_counter) => {
+                let remaining = shape_counter - self.used;
+                if remaining.contains(target) {
+                    (true, new_next_matcher(self, shape_counter.len(), target))
+                } else {
+                    (false, None)
+                }
+            }
+        }
+    }
+}
+
+/// Determines if a sequence of shapes matches a pattern.
+#[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
+pub struct ShapeMatcher<'a> {
+    pattern: &'a Pattern,
+    current: Option<(ShapeMatcherBuffer, usize)>,
+    next: Option<usize>,
+    failed: bool,
+}
+
+impl<'a> ShapeMatcher<'a> {
+    #[inline]
+    fn new(pattern: &'a Pattern) -> Self {
+        match pattern.elements.len() {
+            0 => Self { pattern, current: None, next: None, failed: false },
+            1 => Self { pattern, current: Some((ShapeMatcherBuffer::empty(), 0)), next: None, failed: false },
+            _ => Self { pattern, current: Some((ShapeMatcherBuffer::empty(), 0)), next: Some(1), failed: false },
+        }
+    }
+
+    /// Returns `true` if a remaining shape exists next.
+    #[inline]
+    pub fn has_next(&self) -> bool {
+        self.current.is_some()
+    }
+
+    /// Returns the result of the match and the next matcher.
+    /// If the next shape is contained in the pattern, returns `true` and a matcher to match the next shape.
+    /// If not contained, returns `false` and an empty matcher with no next shape.
+    ///
+    /// If the pattern has successfully matched until the end, the returned matcher will always return `true` regardless of the length of the sequence.
+    /// For example, if the pattern represents "TSO", the sequence "TSOZ..." will also be considered `true`.
+    /// Note that to take the length of the sequence into account, use `has_next()` as well.
+    #[inline]
+    pub fn match_shape(self, target: Shape) -> (bool, ShapeMatcher<'a>) {
+        if self.failed {
+            return (false, self);
+        }
+
+        return match self.current {
+            None => (true, self),
+            Some((current_buffer, current_index)) => {
+                let (matched, next_buffer) = current_buffer.match_shape(&self.pattern.elements[current_index], target);
+                if !matched {
+                    return (false, Self {
+                        pattern: self.pattern,
+                        current: None,
+                        next: None,
+                        failed: true,
+                    });
+                }
+
+                (true, match next_buffer {
+                    Some(buffer) => Self {
+                        pattern: self.pattern,
+                        current: Some((buffer, current_index)),
+                        next: self.next,
+                        failed: false,
+                    },
+                    None => match self.next {
+                        None => Self {
+                            pattern: self.pattern,
+                            current: None,
+                            next: None,
+                            failed: false,
+                        },
+                        Some(next_index) => Self {
+                            pattern: self.pattern,
+                            current: Some((ShapeMatcherBuffer::empty(), next_index)),
+                            next: if next_index + 1 < self.pattern.elements.len() {
+                                Some(next_index + 1)
+                            } else {
+                                None
+                            },
+                            failed: false,
+                        },
+                    },
+                })
+            }
+        };
+    }
+}
+
+impl<'a> From<&'a Pattern> for ShapeMatcher<'a> {
+    fn from(pattern: &'a Pattern) -> Self {
+        Self::new(pattern)
+    }
+}
 
 
 #[cfg(test)]
@@ -526,27 +563,27 @@ mod tests {
         let counter = ShapeCounter::from(vec![Shape::I]);
         let pattern = PatternElement::Permutation(counter, 1);
         assert_eq!(pattern.dim_shapes(), 1);
-        assert_eq!(pattern.len_shapes(), 1);
+        assert_eq!(pattern.count_shapes(), 1);
 
         let counter = ShapeCounter::from(vec![Shape::I, Shape::O, Shape::T]);
         let pattern = PatternElement::Permutation(counter, 1);
         assert_eq!(pattern.dim_shapes(), 1);
-        assert_eq!(pattern.len_shapes(), 3);
+        assert_eq!(pattern.count_shapes(), 3);
 
         let counter = ShapeCounter::from(vec![Shape::I, Shape::O, Shape::T]);
         let pattern = PatternElement::Permutation(counter, 2);
         assert_eq!(pattern.dim_shapes(), 2);
-        assert_eq!(pattern.len_shapes(), 6);
+        assert_eq!(pattern.count_shapes(), 6);
 
         let counter = ShapeCounter::one_of_each();
         let pattern = PatternElement::Permutation(counter, 3);
         assert_eq!(pattern.dim_shapes(), 3);
-        assert_eq!(pattern.len_shapes(), 210);
+        assert_eq!(pattern.count_shapes(), 210);
 
         let counter = ShapeCounter::one_of_each();
         let pattern = PatternElement::Permutation(counter, 5);
         assert_eq!(pattern.dim_shapes(), 5);
-        assert_eq!(pattern.len_shapes(), 2520);
+        assert_eq!(pattern.count_shapes(), 2520);
     }
 
     #[test]
@@ -749,5 +786,254 @@ mod tests {
         // Failure at Permutation
         assert!(!pattern.contains(&vec![T, O, J].into()));
         assert!(!pattern.contains(&vec![T, J, J].into()));
+    }
+
+    #[test]
+    fn cursor_one_accept() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::One(T),
+            PatternElement::One(I),
+            PatternElement::One(O),
+        ]).unwrap();
+
+        {
+            let mut cursor = pattern.new_matcher();
+
+            for shape in [T, I, O] {
+                assert!(cursor.has_next());
+
+                let (accepted, next) = cursor.match_shape(shape);
+                assert!(accepted);
+
+                cursor = next;
+            }
+
+            assert!(!cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(Z);
+            assert!(accepted);
+            assert!(!cursor.has_next());
+        }
+
+        {
+            let cursor = pattern.new_matcher();
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(O);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+        }
+    }
+
+    #[test]
+    fn cursor_fixed_accept() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::Fixed(BitShapes::try_from(vec![S]).unwrap()),
+            PatternElement::Fixed(BitShapes::try_from(vec![T, I, O]).unwrap()),
+        ]).unwrap();
+
+        {
+            let mut cursor = pattern.new_matcher();
+
+            for shape in [S, T, I, O] {
+                assert!(cursor.has_next());
+
+                let (accepted, next) = cursor.match_shape(shape);
+                assert!(accepted);
+
+                cursor = next;
+            }
+
+            assert!(!cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(Z);
+            assert!(accepted);
+            assert!(!cursor.has_next());
+        }
+
+        {
+            let cursor = pattern.new_matcher();
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(O);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(S);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+        }
+    }
+
+    #[test]
+    fn cursor_wildcard_accept() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::Wildcard,
+            PatternElement::Wildcard,
+        ]).unwrap();
+
+        {
+            for shapes in [[S, T], [T, T]] {
+                let mut cursor = pattern.new_matcher();
+
+                for shape in shapes {
+                    assert!(cursor.has_next());
+
+                    let (accepted, next) = cursor.match_shape(shape);
+                    assert!(accepted);
+
+                    cursor = next;
+                }
+
+                assert!(!cursor.has_next());
+
+                let (accepted, cursor) = cursor.match_shape(Z);
+                assert!(accepted);
+                assert!(!cursor.has_next());
+            }
+        }
+    }
+
+    #[test]
+    fn cursor_permutation_accept() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::Permutation(vec![T, T, I, O].try_into().unwrap(), 2),
+            PatternElement::Permutation(vec![L, J].try_into().unwrap(), 2),
+        ]).unwrap();
+
+        {
+            for shapes in [[T, T, L, J], [I, O, J, L]] {
+                let mut cursor = pattern.new_matcher();
+
+                for shape in shapes {
+                    assert!(cursor.has_next());
+
+                    let (accepted, next) = cursor.match_shape(shape);
+                    assert!(accepted);
+
+                    cursor = next;
+                }
+
+                assert!(!cursor.has_next());
+
+                let (accepted, cursor) = cursor.match_shape(Z);
+                assert!(accepted);
+                assert!(!cursor.has_next());
+            }
+        }
+
+        {
+            let cursor = pattern.new_matcher();
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(accepted);
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(accepted);
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(L);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+        }
+
+        {
+            let cursor = pattern.new_matcher();
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(I);
+            assert!(accepted);
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(I);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+        }
+    }
+
+    #[test]
+    fn cursor_factorial_accept() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::Factorial(vec![T, T, O].try_into().unwrap()),
+            PatternElement::Factorial(vec![L, J].try_into().unwrap()),
+        ]).unwrap();
+
+        {
+            for shapes in [[T, T, O, J, L], [T, O, T, L, J], [O, T, T, L, J]] {
+                let mut cursor = pattern.new_matcher();
+
+                for shape in shapes {
+                    assert!(cursor.has_next());
+
+                    let (accepted, next) = cursor.match_shape(shape);
+                    assert!(accepted);
+
+                    cursor = next;
+                }
+
+                assert!(!cursor.has_next());
+
+                let (accepted, cursor) = cursor.match_shape(Z);
+                assert!(accepted);
+                assert!(!cursor.has_next());
+            }
+        }
+
+        {
+            let cursor = pattern.new_matcher();
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(accepted);
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(accepted);
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(L);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+        }
+
+        {
+            let cursor = pattern.new_matcher();
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(O);
+            assert!(accepted);
+            assert!(cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(O);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+
+            let (accepted, cursor) = cursor.match_shape(T);
+            assert!(!accepted);
+            assert!(!cursor.has_next());
+        }
     }
 }

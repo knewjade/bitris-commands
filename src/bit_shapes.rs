@@ -49,6 +49,18 @@ impl BitShapes {
     pub fn to_vec(self) -> Vec<Shape> {
         self.into_iter().collect()
     }
+
+    /// ```
+    /// use bitris_commands::prelude::*;
+    ///
+    /// let shapes = BitShapes::try_from(vec![Shape::T, Shape::I]).unwrap();
+    /// assert_eq!(shapes.get(0), Some(Shape::T));
+    /// assert_eq!(shapes.get(1), Some(Shape::I));
+    /// assert_eq!(shapes.get(2), None);
+    /// ```
+    pub fn get(self, index: usize) -> Option<Shape> {
+        self.into_iter().skip(index).next()
+    }
 }
 
 /// Iterator implementation for `BitShapes`.

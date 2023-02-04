@@ -1,9 +1,9 @@
 pub use bit_shapes::*;
 pub use clipped_board::*;
-pub use shape_sequence::*;
 pub use pattern::*;
-pub use shape_order::*;
 pub use shape_counter::*;
+pub use shape_order::*;
+pub use shape_sequence::*;
 pub use traits::*;
 
 #[doc(hidden)]
