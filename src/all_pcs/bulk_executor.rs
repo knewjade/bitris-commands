@@ -139,7 +139,7 @@ impl<'a, T: RotationSystem> AllPcsFromPatternBulkExecutor<'a, T> {
         let aggregator = Builder::new(self.clipped_board, max_shape_counter, 10)
             .to_aggregator(self.spawn_position);
 
-        aggregator.aggregate_with_shape_counters(&shape_counters)
+        aggregator.aggregate_with_pattern(self.pattern)
     }
 }
 
@@ -385,7 +385,7 @@ mod tests {
 
         {
             let pattern = vec![
-                PatternElement::Fixed(vec![Shape::O, Shape::T].try_into().unwrap()),
+                PatternElement::Fixed(vec![Shape::O, Shape::Z, Shape::T].try_into().unwrap()),
             ].try_into().unwrap();
             let executor = AllPcsFromPatternBulkExecutor::try_new(
                 move_rules, clipped_board, &pattern,
@@ -414,5 +414,47 @@ mod tests {
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result.len(), 63);
+    }
+
+    #[test]
+    fn pco_with_iz() {
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
+        let board = Board64::from_str("
+            ###.....##
+            ###....###
+            ###.....##
+            ###......#
+        ").unwrap();
+        let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+        let pattern = vec![
+            PatternElement::Factorial(vec![Shape::I, Shape::Z].try_into().unwrap()),
+            PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
+        ].try_into().unwrap();
+        let executor = AllPcsFromPatternBulkExecutor::try_new(
+            move_rules, clipped_board, &pattern,
+        ).unwrap();
+        let result = executor.execute();
+        assert_eq!(result.len(), 118);
+    }
+
+    #[test]
+    fn test1() {
+        let move_rules = MoveRules::srs(AllowMove::Softdrop);
+        let board = Board64::from_str("
+            ###....###
+            ###....###
+            ###....###
+            ###....###
+        ").unwrap();
+        let clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+        let pattern = vec![
+            PatternElement::Factorial(vec![Shape::T, Shape::Z].try_into().unwrap()),
+            PatternElement::Factorial(vec![Shape::T, Shape::S].try_into().unwrap()),
+        ].try_into().unwrap();
+        let executor = AllPcsFromPatternBulkExecutor::try_new(
+            move_rules, clipped_board, &pattern,
+        ).unwrap();
+        let result = executor.execute();
+        assert_eq!(result.len(), 3);
     }
 }

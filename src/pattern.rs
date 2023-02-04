@@ -1,6 +1,13 @@
+use std::collections::BTreeSet;
+use std::iter::Map;
+use std::usize;
+use std::vec::IntoIter;
+
+use bitris::{OrderCursor, PopOp};
 use bitris::prelude::Shape;
 use itertools::{Itertools, repeat_n};
 use thiserror::Error;
+use tinyvec::{Array, ArrayVec};
 
 use crate::{ShapeCounter, ShapeOrder, ShapeSequence};
 use crate::bit_shapes::BitShapes;
@@ -65,8 +72,8 @@ impl PatternElement {
     /// The count of shapes the pattern has.
     pub fn count_shapes(&self) -> usize {
         match self {
-            PatternElement::One(_) => 1,
-            PatternElement::Fixed(_) => 1,
+            PatternElement::One(..) => 1,
+            PatternElement::Fixed(..) => 1,
             PatternElement::Wildcard => 7,
             PatternElement::Permutation(counter, pop) => {
                 let pop = *pop;
@@ -80,7 +87,7 @@ impl PatternElement {
     /// The number of elements in one shapes.
     pub fn dim_shapes(&self) -> usize {
         match *self {
-            PatternElement::One(_) => 1,
+            PatternElement::One(..) => 1,
             PatternElement::Fixed(shapes) => shapes.len(),
             PatternElement::Wildcard => 1,
             PatternElement::Permutation(counter, pop) => {
@@ -453,7 +460,7 @@ impl ShapeMatcherBuffer {
 #[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub struct ShapeMatcher<'a> {
     pattern: &'a Pattern,
-    current: Option<(ShapeMatcherBuffer, usize)>,
+    current: Option<(usize, ShapeMatcherBuffer)>,
     next: Option<usize>,
     failed: bool,
 }
@@ -461,10 +468,10 @@ pub struct ShapeMatcher<'a> {
 impl<'a> ShapeMatcher<'a> {
     #[inline]
     fn new(pattern: &'a Pattern) -> Self {
+        assert!(!pattern.elements.is_empty());
         match pattern.elements.len() {
-            0 => Self { pattern, current: None, next: None, failed: false },
-            1 => Self { pattern, current: Some((ShapeMatcherBuffer::empty(), 0)), next: None, failed: false },
-            _ => Self { pattern, current: Some((ShapeMatcherBuffer::empty(), 0)), next: Some(1), failed: false },
+            1 => Self { pattern, current: Some((0, ShapeMatcherBuffer::empty())), next: None, failed: false },
+            _ => Self { pattern, current: Some((0, ShapeMatcherBuffer::empty())), next: Some(1), failed: false },
         }
     }
 
@@ -489,7 +496,7 @@ impl<'a> ShapeMatcher<'a> {
 
         return match self.current {
             None => (true, self),
-            Some((current_buffer, current_index)) => {
+            Some((current_index, current_buffer)) => {
                 let (matched, next_buffer) = current_buffer.match_shape(&self.pattern.elements[current_index], target);
                 if !matched {
                     return (false, Self {
@@ -503,7 +510,7 @@ impl<'a> ShapeMatcher<'a> {
                 (true, match next_buffer {
                     Some(buffer) => Self {
                         pattern: self.pattern,
-                        current: Some((buffer, current_index)),
+                        current: Some((current_index, buffer)),
                         next: self.next,
                         failed: false,
                     },
@@ -516,7 +523,7 @@ impl<'a> ShapeMatcher<'a> {
                         },
                         Some(next_index) => Self {
                             pattern: self.pattern,
-                            current: Some((ShapeMatcherBuffer::empty(), next_index)),
+                            current: Some((next_index, ShapeMatcherBuffer::empty())),
                             next: if next_index + 1 < self.pattern.elements.len() {
                                 Some(next_index + 1)
                             } else {
@@ -538,11 +545,265 @@ impl<'a> From<&'a Pattern> for ShapeMatcher<'a> {
 }
 
 
+#[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
+pub struct PatternHoldExpand<'a> {
+    pattern: &'a Pattern,
+    vec: Vec<Vec<RelatedPatternElement>>,
+}
+
+impl PatternHoldExpand<'_> {
+    /// Returns a matcher that determines whether a sequence of the shapes is contained in the pattern.
+    pub fn new_matcher(&self) -> ShapeMatcher2 {
+        self.into()
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+enum RelatedPatternElement {
+    Fixed(Shape),
+    Shared(usize),
+}
+
+impl<'a> From<&'a Pattern> for PatternHoldExpand<'a> {
+    fn from(pattern: &'a Pattern) -> Self {
+        fn simplify((element_index, element): (usize, &PatternElement)) -> Vec<RelatedPatternElement> {
+            use RelatedPatternElement::*;
+            match element {
+                PatternElement::One(shape) => vec![Fixed(*shape)],
+                PatternElement::Fixed(shapes) => shapes.to_vec().into_iter().map(|shape| Fixed(shape)).collect(),
+                PatternElement::Wildcard => vec![Shared(element_index)],
+                PatternElement::Permutation(_, pop) => {
+                    vec![
+                        vec![Shared(element_index)].repeat(*pop),
+                    ].concat()
+                }
+                PatternElement::Factorial(counter) => {
+                    vec![
+                        vec![Shared(element_index)].repeat(counter.len()),
+                    ].concat()
+                }
+            }
+        }
+
+        let simply_elements: Vec<RelatedPatternElement> = pattern.elements.iter()
+            .enumerate()
+            .flat_map(simplify)
+            .collect();
+
+        assert!(!simply_elements.is_empty());
+
+        struct Builder<'a> {
+            results: BTreeSet<Vec<RelatedPatternElement>>,
+            buffer: Vec<&'a RelatedPatternElement>,
+        }
+
+        impl<'a> Builder<'a> {
+            fn build(&mut self, cursor: OrderCursor<'a, RelatedPatternElement>) {
+                if !cursor.has_next() {
+                    self.results.insert(self.buffer.iter().map(|&it| *it).collect());
+                    return;
+                }
+
+                {
+                    let (popped, next_cursor) = cursor.pop(PopOp::First);
+                    if let Some(pair) = popped {
+                        self.buffer.push(pair);
+                        self.build(next_cursor);
+                        self.buffer.pop();
+                    }
+                }
+                {
+                    let (popped, next_cursor) = cursor.pop(PopOp::Second);
+                    if let Some(pair) = popped {
+                        self.buffer.push(pair);
+                        self.build(next_cursor);
+                        self.buffer.pop();
+                    }
+                }
+            }
+        }
+
+        let mut builder = Builder {
+            results: BTreeSet::default(),
+            buffer: Vec::new(),
+        };
+
+        let cursor = OrderCursor::from(&simply_elements);
+        builder.build(cursor);
+
+        Self {
+            pattern,
+            vec: builder.results.into_iter().collect(),
+        }
+    }
+}
+
+/// Determines if a sequence of shapes matches a pattern.
+#[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
+pub struct ShapeMatcher3 {
+    p_index: usize,
+    stored: ArrayVec<[(usize, ShapeCounter); 2]>,
+    // (shared_index, used)
+    current: Option<usize>, // (expanded_pattern_element_index)
+}
+
+/// Determines if a sequence of shapes matches a pattern.
+#[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
+pub struct ShapeMatcher2<'a> {
+    pattern: &'a PatternHoldExpand<'a>,
+    candidates: Vec<ShapeMatcher3>,
+    succeed_always: bool,
+}
+
+impl<'a> ShapeMatcher2<'a> {
+    #[inline]
+    fn new(pattern: &'a PatternHoldExpand) -> Self {
+        assert!(!pattern.vec.is_empty());
+        assert!(pattern.vec.iter().all(|it| !it.is_empty()));
+
+        let candidates = pattern.vec.iter()
+            .enumerate()
+            .filter(|(_, elements)| !elements.is_empty())
+            .map(|(p_index, _)| ShapeMatcher3 {
+                p_index,
+                stored: ArrayVec::new(),
+                current: Some(0),
+            })
+            .collect();
+
+        Self {
+            pattern,
+            candidates,
+            succeed_always: false,
+        }
+    }
+
+    /// Returns `true` if a remaining shape exists next.
+    #[inline]
+    pub fn has_next(&self) -> bool {
+        !self.candidates.is_empty() && self.candidates.iter().any(|candidate| candidate.current.is_some())
+    }
+
+    /// Returns the result of the match and the next matcher.
+    /// If the next shape is contained in the pattern, returns `true` and a matcher to match the next shape.
+    /// If not contained, returns `false` and an empty matcher with no next shape.
+    ///
+    /// If the pattern has successfully matched until the end, the returned matcher will always return `true` regardless of the length of the sequence.
+    /// For example, if the pattern represents "TSO", the sequence "TSOZ..." will also be considered `true`.
+    /// Note that to take the length of the sequence into account, use `has_next()` as well.
+    #[inline]
+    pub fn match_shape(&self, target: Shape) -> (bool, ShapeMatcher2<'a>) {
+        if self.succeed_always {
+            return (true, self.clone());
+        }
+
+        if self.candidates.is_empty() {
+            return (false, self.clone());
+        }
+
+        let mut next_candidates = Vec::<ShapeMatcher3>::new();
+        'outer: for candidate in &self.candidates {
+            let index = if let Some(index) = candidate.current {
+                index
+            } else {
+                continue 'outer;
+            };
+            let next_stored = match &self.pattern.vec[candidate.p_index][index] {
+                RelatedPatternElement::Fixed(shape) => {
+                    if target != *shape {
+                        continue 'outer;
+                    }
+                    candidate.stored
+                }
+                RelatedPatternElement::Shared(pattern_element_index) => {
+                    let gen_next_stored = || -> Option<ArrayVec<[(usize, ShapeCounter); 2]>> {
+                        let pattern_element = self.pattern.pattern.elements[*pattern_element_index];
+                        let mut next_stored = candidate.stored.clone();
+
+                        let mut nsi = None;
+                        for nsi2 in 0..=1 {
+                            if candidate.stored.get(nsi2).filter(|it| it.0 == *pattern_element_index).is_some() {
+                                nsi = Some(nsi2);
+                                break;
+                            }
+                        }
+
+                        let nsi = if let Some(nsi) = nsi {
+                            nsi
+                        } else {
+                            let i = next_stored.len();
+                            next_stored.push((*pattern_element_index, ShapeCounter::empty()));
+                            i
+                        };
+
+                        next_stored[nsi].1 += target;
+
+                        let matches = match pattern_element {
+                            PatternElement::Wildcard => true,
+                            PatternElement::Permutation(counter, _) => counter.contains_all(&next_stored[nsi].1),
+                            PatternElement::Factorial(counter) => counter.contains_all(&next_stored[nsi].1),
+                            _ => panic!("Unreachable"),
+                        };
+
+                        if !matches {
+                            return None;
+                        }
+
+                        let len_used = next_stored[nsi].1.len();
+                        let last = len_used == pattern_element.dim_shapes();
+
+                        if last {
+                            next_stored.remove(nsi);
+                        }
+
+                        Some(next_stored)
+                    };
+
+                    if let Some(next_stored) = gen_next_stored() {
+                        next_stored
+                    } else {
+                        continue 'outer;
+                    }
+                }
+            };
+
+            next_candidates.push(ShapeMatcher3 {
+                p_index: candidate.p_index,
+                stored: next_stored,
+                current: if index + 1 < self.pattern.vec[candidate.p_index].len() {
+                    Some(index + 1)
+                } else {
+                    None
+                },
+            });
+        }
+
+        let succeed = !next_candidates.is_empty();
+        let succeed_always = succeed && next_candidates.iter().any(|candidate| candidate.current.is_none());
+        (succeed, Self {
+            pattern: self.pattern,
+            candidates: if succeed_always {
+                Vec::new()
+            } else {
+                next_candidates
+            },
+            succeed_always,
+        })
+    }
+}
+
+impl<'a> From<&'a PatternHoldExpand<'a>> for ShapeMatcher2<'a> {
+    fn from(pattern: &'a PatternHoldExpand) -> Self {
+        Self::new(pattern)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use bitris::prelude::Shape;
 
-    use crate::{Pattern, PatternCreationError, PatternElement, ShapeCounter};
+    use crate::{Pattern, PatternCreationError, PatternElement, PatternHoldExpand, ShapeCounter};
     use crate::bit_shapes::BitShapes;
 
     #[test]
@@ -1034,6 +1295,65 @@ mod tests {
             let (accepted, cursor) = cursor.match_shape(T);
             assert!(!accepted);
             assert!(!cursor.has_next());
+        }
+    }
+
+    #[test]
+    fn extend() {
+        use Shape::*;
+        let pattern = Pattern::try_from(vec![
+            PatternElement::Fixed(vec![T, I].try_into().unwrap()),
+            PatternElement::Factorial(vec![L, J].try_into().unwrap()),
+            PatternElement::One(O),
+        ]).unwrap();
+
+        let expand = PatternHoldExpand::from(&pattern);
+
+        for shapes in [[T, I, J, L, O], [I, L, J, O, T], [I, J, T, O, L]] {
+            let mut matcher = expand.new_matcher();
+            for shape in shapes {
+                assert!(matcher.has_next());
+
+                let (matched, next) = matcher.match_shape(shape);
+                assert!(matched);
+
+                matcher = next;
+            }
+
+            assert!(!matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(S);
+            assert!(matched);
+            assert!(!matcher.has_next());
+        }
+    }
+
+    #[test]
+    fn extend2() {
+        use Shape::*;
+        let pattern = vec![
+            PatternElement::Factorial(vec![T, Z].try_into().unwrap()),
+            PatternElement::Factorial(vec![T, S].try_into().unwrap()),
+        ].try_into().unwrap();
+
+        let expand = PatternHoldExpand::from(&pattern);
+
+        for shapes in [[T, T, Z, S]] {
+            let mut matcher = expand.new_matcher();
+            for shape in shapes {
+                assert!(matcher.has_next());
+
+                let (matched, next) = matcher.match_shape(shape);
+                assert!(matched);
+
+                matcher = next;
+            }
+
+            assert!(!matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(O);
+            assert!(matched);
+            assert!(!matcher.has_next());
         }
     }
 }

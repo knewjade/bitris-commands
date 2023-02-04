@@ -1,13 +1,12 @@
 use bitris::prelude::*;
 use fxhash::FxHashMap;
+use itertools::Itertools;
 
-use crate::{ClippedBoard, ShapeCounter};
+use crate::{ClippedBoard, Pattern, PatternHoldExpand, ShapeCounter, ShapeMatcher2};
 use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes};
 
 trait PcAggregationChecker {
-    fn checks(&self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) -> bool;
-
-    fn save(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>);
+    fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>);
 }
 
 pub(crate) struct Aggregator {
@@ -67,7 +66,7 @@ impl Aggregator {
         }
 
         impl PcAggregationChecker for PcAggregationCheckerImpl<'_> {
-            fn checks(&self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) -> bool {
+            fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) {
                 let succeed = {
                     let shape_counter: ShapeCounter = placed_piece_blocks_vec.iter()
                         .map(|it| it.placed_piece.piece.shape)
@@ -75,28 +74,165 @@ impl Aggregator {
                     self.shape_counters.iter().any(|it| it.contains_all(&shape_counter))
                 };
                 if !succeed {
-                    return false;
+                    return;
                 }
 
                 let succeed = PlacedPieceBlocksFlow::find_one_stackable(
                     self.clipped_board.board(),
-                    placed_piece_blocks_vec.clone(),
+                    placed_piece_blocks_vec,
                     MoveRules::default(),
                     self.spawn_position,
-                ).is_some();
-                if !succeed {
-                    return false;
+                );
+
+                if let Some(flow) = succeed {
+                    self.solutions.push(flow.refs.iter().map(|it| it.placed_piece).collect())
                 }
-
-                true
-            }
-
-            fn save(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) {
-                self.solutions.push(placed_piece_blocks_vec.iter().map(|it| it.placed_piece).collect())
             }
         }
 
         let mut checker = PcAggregationCheckerImpl {
+            shape_counters,
+            clipped_board: self.clipped_board,
+            spawn_position: self.spawn_position,
+            solutions: Vec::new(),
+        };
+
+        let mut results = Vec::with_capacity((self.clipped_board.spaces() / 4) as usize);
+        self.aggregate_recursively(self.nodes.head_index_id().unwrap(), &mut results, &mut checker);
+        PcSolutions {
+            clipped_board: self.clipped_board,
+            placed_pieces: checker.solutions,
+        }
+    }
+
+    pub(crate) fn aggregate_with_pattern(&self, pattern: &Pattern) -> PcSolutions {
+        if self.nodes.indexes.is_empty() {
+            return PcSolutions::empty(self.clipped_board);
+        }
+
+        let shape_counters: Vec<ShapeCounter> = pattern.to_shape_counter_vec();
+
+        fn visit_all_dyn<'a>(
+            initial_board: Board64,
+            pattern: &Pattern,
+            refs: &Vec<&'a PlacedPieceBlocks>,
+            validator: impl Fn(&Board64, BlPlacement) -> SearchResult,
+        ) -> Option<PlacedPieceBlocksFlow<'a>> {
+            if refs.is_empty() {
+                return None;
+            }
+
+            assert!(refs.len() < 64, "refs length supports up to 64.");
+
+            struct Builder<'a, 'b> {
+                refs: &'a Vec<&'b PlacedPieceBlocks>,
+                results: Vec<&'b PlacedPieceBlocks>,
+            }
+
+            impl Builder<'_, '_> {
+                fn build(
+                    &mut self,
+                    board: Board64,
+                    remaining: u64,
+                    matcher: ShapeMatcher2,
+                    validator: &impl Fn(&Board64, BlPlacement) -> SearchResult,
+                ) -> bool {
+                    let mut candidates = remaining;
+                    while 0 < candidates {
+                        let next_candidates = candidates & (candidates - 1);
+                        let bit = candidates - next_candidates;
+                        let next_remaining = remaining - bit;
+
+                        candidates = next_candidates;
+
+                        let placed_piece_blocks = self.refs[bit.trailing_zeros() as usize];
+                        let shape = placed_piece_blocks.placed_piece.piece.shape;
+                        let (matched, next_matcher) = matcher.match_shape(shape);
+                        if !matched {
+                            continue;
+                        }
+
+                        if let Some(placement) = placed_piece_blocks.place_according_to(board) {
+                            if validator(&board, placement) == SearchResult::Pruned {
+                                continue;
+                            }
+
+                            self.results.push(placed_piece_blocks);
+
+                            if next_remaining == 0 {
+                                return true;
+                            }
+
+                            let mut next_board = board;
+                            next_board.set_all(&placed_piece_blocks.locations);
+
+                            if self.build(next_board, next_remaining, next_matcher, validator) {
+                                return true;
+                            }
+                            self.results.pop();
+                        }
+                    }
+
+                    false
+                }
+            }
+
+            let len = refs.len();
+            let mut builder = Builder {
+                refs,
+                results: Vec::with_capacity(len),
+            };
+
+            let pattern_hold_expand = PatternHoldExpand::from(pattern);
+            if builder.build(initial_board, (1u64 << len) - 1, pattern_hold_expand.new_matcher(), &validator) {
+                Some(PlacedPieceBlocksFlow::new(initial_board, builder.results))
+            } else {
+                None
+            }
+        }
+
+        struct PcAggregationCheckerImpl<'a> {
+            pattern: &'a Pattern,
+            shape_counters: Vec<ShapeCounter>,
+            clipped_board: ClippedBoard,
+            spawn_position: BlPosition,
+            solutions: Vec<Vec<PlacedPiece>>,
+        }
+
+        impl PcAggregationChecker for PcAggregationCheckerImpl<'_> {
+            fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) {
+                let succeed = {
+                    let shape_counter: ShapeCounter = placed_piece_blocks_vec.iter()
+                        .map(|it| it.placed_piece.piece.shape)
+                        .collect();
+                    self.shape_counters.iter().any(|it| it.contains_all(&shape_counter))
+                };
+                if !succeed {
+                    return;
+                }
+
+                let move_rules = MoveRules::default();
+                let succeed = visit_all_dyn(
+                    self.clipped_board.board(),
+                    self.pattern,
+                    placed_piece_blocks_vec,
+                    |board, placement| {
+                        let board_to_place = board.after_clearing();
+                        if move_rules.can_reach(placement, board_to_place, placement.piece.with(self.spawn_position)) {
+                            return SearchResult::Success;
+                        }
+                        SearchResult::Pruned
+                    },
+                );
+
+                if let Some(flow) = succeed {
+                    self.solutions.push(flow.refs.iter().map(|it| it.placed_piece).collect())
+                }
+            }
+        }
+
+        let mut checker = PcAggregationCheckerImpl {
+            pattern,
             shape_counters,
             clipped_board: self.clipped_board,
             spawn_position: self.spawn_position,
@@ -180,8 +316,8 @@ impl Aggregator {
                     }
                 }
 
-                if ok && checker.checks(placed_pieces) {
-                    checker.save(placed_pieces);
+                if ok {
+                    checker.save_if_need(placed_pieces);
                 }
             }
             IndexNode::Abort => {}

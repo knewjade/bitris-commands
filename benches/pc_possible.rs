@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::str::FromStr;
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{black_box, Criterion, criterion_group, criterion_main};
 
 use bitris_commands::pc_possible;
 use bitris_commands::prelude::*;
@@ -138,7 +138,7 @@ fn bench_pc_possibles(c: &mut Criterion) {
     benchmarks.iter().for_each(|benchmark| {
         let id = format!("pc-rates-{}", benchmark.id);
         c.bench_function(id.as_str(), |b| {
-            b.iter(|| pc_possible(benchmark));
+            b.iter(|| pc_possible(black_box(benchmark)));
         });
     });
 }
