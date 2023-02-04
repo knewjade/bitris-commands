@@ -1,8 +1,7 @@
 use bitris::prelude::*;
 use fxhash::FxHashMap;
-use itertools::Itertools;
 
-use crate::{ClippedBoard, Pattern, PatternHoldExpand, ShapeCounter, ShapeMatcher2};
+use crate::{ClippedBoard, Pattern, HoldExpandedPattern, ShapeCounter, ShapeMatcher2};
 use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes};
 
 trait PcAggregationChecker {
@@ -183,7 +182,7 @@ impl Aggregator {
                 results: Vec::with_capacity(len),
             };
 
-            let pattern_hold_expand = PatternHoldExpand::from(pattern);
+            let pattern_hold_expand = HoldExpandedPattern::from(pattern);
             if builder.build(initial_board, (1u64 << len) - 1, pattern_hold_expand.new_matcher(), &validator) {
                 Some(PlacedPieceBlocksFlow::new(initial_board, builder.results))
             } else {
