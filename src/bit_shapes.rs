@@ -161,6 +161,12 @@ mod tests {
     use crate::BitShapes;
 
     #[test]
+    fn empty() {
+        let shapes = BitShapes::empty();
+        assert_eq!(shapes.len(), 0);
+    }
+
+    #[test]
     fn len7() {
         let shapes = BitShapes::try_from(Shape::all_iter().collect_vec()).unwrap();
         assert_eq!(shapes.len(), 7);

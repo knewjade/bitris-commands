@@ -113,11 +113,12 @@ impl<'a> ShapeMatcher2<'a> {
                         };
 
                         next_stored[store_index].1 += target;
+                        let next_consumed = &next_stored[store_index].1;
 
                         let matches = match pattern_element {
                             PatternElement::Wildcard => true,
-                            PatternElement::Permutation(counter, _) => counter.contains_all(&next_stored[store_index].1),
-                            PatternElement::Factorial(counter) => counter.contains_all(&next_stored[store_index].1),
+                            PatternElement::Permutation(counter, _) => counter.contains_all(next_consumed),
+                            PatternElement::Factorial(counter) => counter.contains_all(next_consumed),
                             _ => panic!("Unreachable"),
                         };
 
@@ -125,10 +126,8 @@ impl<'a> ShapeMatcher2<'a> {
                             return None;
                         }
 
-                        let len_consumed = next_stored[store_index].1.len();
-                        let last = len_consumed == pattern_element.dim_shapes();
-
-                        if last {
+                        // If it is the last element in that pattern element, remove it from the store.
+                        if next_consumed.len() == pattern_element.dim_shapes() {
                             next_stored.remove(store_index);
                         }
 
@@ -182,7 +181,7 @@ mod tests {
     use crate::{HoldExpandedPattern, Pattern, PatternElement};
 
     #[test]
-    fn match_shape_case1() {
+    fn matcher_case1() {
         use Shape::*;
         let pattern = Pattern::try_from(vec![
             PatternElement::Fixed(vec![T, I].try_into().unwrap()),
@@ -209,10 +208,22 @@ mod tests {
             assert!(matched);
             assert!(!matcher.has_next());
         }
+        {
+            let matcher = hold_expanded_pattern.new_matcher();
+            assert!(matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(O);
+            assert!(!matched);
+            assert!(!matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(O);
+            assert!(!matched);
+            assert!(!matcher.has_next());
+        }
     }
 
     #[test]
-    fn match_shape_case2() {
+    fn matcher_case2() {
         use Shape::*;
         let pattern = vec![
             PatternElement::Factorial(vec![T, Z].try_into().unwrap()),
@@ -236,6 +247,59 @@ mod tests {
 
             let (matched, matcher) = matcher.match_shape(O);
             assert!(matched);
+            assert!(!matcher.has_next());
+        }
+        {
+            let matcher = hold_expanded_pattern.new_matcher();
+            assert!(matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(O);
+            assert!(!matched);
+            assert!(!matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(O);
+            assert!(!matched);
+            assert!(!matcher.has_next());
+        }
+    }
+
+    #[test]
+    fn matcher_case3() {
+        use Shape::*;
+        let pattern = vec![
+            PatternElement::Permutation(vec![S, Z].try_into().unwrap(), 1),
+            PatternElement::Permutation(vec![L, J].try_into().unwrap(), 2),
+        ].try_into().unwrap();
+
+        let hold_expanded_pattern = HoldExpandedPattern::from(&pattern);
+
+        for shapes in [[S, L, J], [Z, L, J], [L, S, J], [L, J, Z]] {
+            let mut matcher = hold_expanded_pattern.new_matcher();
+            for shape in shapes {
+                assert!(matcher.has_next());
+
+                let (matched, next) = matcher.match_shape(shape);
+                assert!(matched);
+
+                matcher = next;
+            }
+
+            assert!(!matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(O);
+            assert!(matched);
+            assert!(!matcher.has_next());
+        }
+        {
+            let matcher = hold_expanded_pattern.new_matcher();
+            assert!(matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(O);
+            assert!(!matched);
+            assert!(!matcher.has_next());
+
+            let (matched, matcher) = matcher.match_shape(O);
+            assert!(!matched);
             assert!(!matcher.has_next());
         }
     }
