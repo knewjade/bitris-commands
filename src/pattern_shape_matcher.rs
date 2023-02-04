@@ -1,6 +1,6 @@
 use bitris::prelude::*;
 
-use crate::{Pattern, PatternElement, ShapeCounter};
+use crate::{Pattern, PatternElement, ShapeCounter, ShapeMatcher};
 
 /// Determines if a sequence of shapes matches a pattern element.
 #[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
@@ -85,10 +85,12 @@ impl<'a> PatternShapeMatcher<'a> {
             _ => Self { pattern, current: Some((0, PatternShapeMatcherBuffer::empty())), next: Some(1), failed: false },
         }
     }
+}
 
+impl<'a> ShapeMatcher for PatternShapeMatcher<'a> {
     /// Returns `true` if a remaining shape exists next.
     #[inline]
-    pub fn has_next(&self) -> bool {
+    fn has_next(&self) -> bool {
         self.current.is_some()
     }
 
@@ -134,14 +136,13 @@ impl<'a> PatternShapeMatcher<'a> {
     ///     assert!(!matcher.has_next());
     /// }
     /// ```
-    #[inline]
-    pub fn match_shape(self, target: Shape) -> (bool, PatternShapeMatcher<'a>) {
+    fn match_shape(&self, target: Shape) -> (bool, PatternShapeMatcher<'a>) {
         if self.failed {
-            return (false, self);
+            return (false, self.clone());
         }
 
         return match self.current {
-            None => (true, self),
+            None => (true, self.clone()),
             Some((current_index, current_buffer)) => {
                 let (matched, next_buffer) = current_buffer.match_shape(&self.pattern.elements[current_index], target);
                 if !matched {
@@ -195,7 +196,7 @@ impl<'a> From<&'a Pattern> for PatternShapeMatcher<'a> {
 mod tests {
     use bitris::prelude::Shape;
 
-    use crate::{Pattern, PatternElement};
+    use crate::{Pattern, PatternElement, ShapeMatcher};
 
     #[test]
     fn matcher_one() {

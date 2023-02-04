@@ -6,11 +6,11 @@ use bitris_commands::all_pcs;
 use bitris_commands::prelude::*;
 
 #[inline(always)]
-fn all_pcs_from_shape_counter(data: &AllPcsFromShapeCounterBenchmarkData) {
+fn all_pcs_from_counters(data: &AllPcsFromShapeCounterBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
-    let executor = all_pcs::AllPcsFromCounterBulkExecutor::try_new(
-        move_rules, clipped_board, &data.shape_counters,
+    let executor = all_pcs::AllPcsFromCountersBulkExecutor::try_new(
+        &move_rules, clipped_board, &data.shape_counters,
     ).unwrap();
     let result = executor.execute();
     assert_eq!(result.len(), data.expected);
@@ -21,7 +21,7 @@ fn all_pcs_from_pattern(data: &AllPcsFromPatternBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
     let executor = all_pcs::AllPcsFromPatternBulkExecutor::try_new(
-        move_rules, clipped_board, &data.pattern,
+        &move_rules, clipped_board, &data.pattern, data.allows_hold,
     ).unwrap();
     let result = executor.execute();
     assert_eq!(result.len(), data.expected);
@@ -37,7 +37,7 @@ struct AllPcsFromShapeCounterBenchmarkData {
     expected: usize,
 }
 
-fn bench_all_pcs_from_shape_counters(c: &mut Criterion) {
+fn bench_all_pcs_from_counters(c: &mut Criterion) {
     let benchmarks = vec![
         AllPcsFromShapeCounterBenchmarkData {
             id: format!("pco-wildcard3"),
@@ -90,9 +90,9 @@ fn bench_all_pcs_from_shape_counters(c: &mut Criterion) {
     ];
 
     benchmarks.iter().for_each(|benchmark| {
-        let id = format!("all-pcs-from-shape-counters-{}", benchmark.id);
+        let id = format!("all-pcs-from-counters-{}", benchmark.id);
         c.bench_function(id.as_str(), |b| {
-            b.iter(|| all_pcs_from_shape_counter(black_box(benchmark)));
+            b.iter(|| all_pcs_from_counters(black_box(benchmark)));
         });
     });
 }
@@ -104,6 +104,7 @@ struct AllPcsFromPatternBenchmarkData {
     height: u32,
     pattern: Pattern,
     allow_move: AllowMove,
+    allows_hold: bool,
     expected: usize,
 }
 
@@ -125,6 +126,7 @@ fn bench_all_pcs_from_pattern(c: &mut Criterion) {
                 PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
             ].try_into().unwrap(),
             allow_move: AllowMove::Softdrop,
+            allows_hold: true,
             expected: 63,
         },
         AllPcsFromPatternBenchmarkData {
@@ -142,6 +144,7 @@ fn bench_all_pcs_from_pattern(c: &mut Criterion) {
                 PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
             ].try_into().unwrap(),
             allow_move: AllowMove::Softdrop,
+            allows_hold: true,
             expected: 605,
         },
     ];
@@ -154,5 +157,5 @@ fn bench_all_pcs_from_pattern(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_all_pcs_from_shape_counters, bench_all_pcs_from_pattern);
+criterion_group!(benches, bench_all_pcs_from_counters, bench_all_pcs_from_pattern);
 criterion_main!(benches);

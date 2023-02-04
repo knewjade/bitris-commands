@@ -389,7 +389,7 @@ impl Pattern {
 mod tests {
     use bitris::prelude::Shape;
 
-    use crate::{Pattern, PatternCreationError, PatternElement, ShapeCounter};
+    use crate::{Pattern, PatternCreationError, PatternElement, ShapeCounter, ShapeMatcher};
     use crate::bit_shapes::BitShapes;
 
     #[test]

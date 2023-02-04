@@ -88,7 +88,7 @@ impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
             },
         };
 
-        self.try_bind(move_rules, &pattern)
+        self.try_bind(&move_rules, &pattern)
             .map(|executor| {
                 executor.execute_single()
             })
@@ -101,7 +101,7 @@ impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
             })
     }
 
-    fn try_bind<'a>(&'a self, move_rules: MoveRules<'a, T>, pattern: &'a Pattern) -> Result<PcPossibleBulkExecutor<T>, PcPossibleExecutorBulkCreationError> {
+    fn try_bind<'a>(&'a self, move_rules: &'a MoveRules<'a, T>, pattern: &'a Pattern) -> Result<PcPossibleBulkExecutor<T>, PcPossibleExecutorBulkCreationError> {
         PcPossibleBulkExecutor::try_new(
             move_rules,
             self.clipped_board,

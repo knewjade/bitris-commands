@@ -11,7 +11,7 @@ fn pc_possible(data: &PcPossibleBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
     let executor = pc_possible::PcPossibleBulkExecutor::try_new(
-        move_rules, clipped_board, &data.pattern, data.allows_hold,
+        &move_rules, clipped_board, &data.pattern, data.allows_hold,
     ).unwrap();
     let result = executor.execute();
     assert_eq!(result.count_succeed(), data.expected);

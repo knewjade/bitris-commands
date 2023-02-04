@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use bitris::prelude::*;
 
-use crate::{Pattern, PatternElement, ShapeMatcher2};
+use crate::{Pattern, PatternElement, HoldExpandedPatternShapeMatcher};
 
 /// Based on the pattern, it extends to the sequence obtained in the hold.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
@@ -13,7 +13,7 @@ pub struct HoldExpandedPattern<'a> {
 
 impl HoldExpandedPattern<'_> {
     /// Returns a matcher that determines whether a sequence of the shapes is contained in the expanded pattern with hold.
-    pub fn new_matcher(&self) -> ShapeMatcher2 {
+    pub fn new_matcher(&self) -> HoldExpandedPatternShapeMatcher {
         self.into()
     }
 }

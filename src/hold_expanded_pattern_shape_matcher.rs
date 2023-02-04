@@ -1,12 +1,12 @@
 use bitris::prelude::*;
 use tinyvec::ArrayVec;
 
-use crate::{HoldExpandedPattern, PatternElement, ShapeCounter};
+use crate::{HoldExpandedPattern, PatternElement, ShapeCounter, ShapeMatcher};
 use crate::hold_expanded_pattern::HoldExpandedPatternElement;
 
 /// Determines if a sequence of shapes matches a expanded pattern with hold.
 #[derive(Copy, Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub struct HoldExpandedPatternShapeMatcher {
+struct HoldExpandedPatternCandidateShapeMatcher {
     expanded_elements_vec_index: usize,
 
     // Arrays of pairs (index of a pattern element, consumed shapes).
@@ -21,13 +21,13 @@ pub struct HoldExpandedPatternShapeMatcher {
 
 /// Determines if a sequence of shapes matches a pattern.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub struct ShapeMatcher2<'a> {
+pub struct HoldExpandedPatternShapeMatcher<'a> {
     pattern: &'a HoldExpandedPattern<'a>,
-    candidates: Vec<HoldExpandedPatternShapeMatcher>,
+    candidates: Vec<HoldExpandedPatternCandidateShapeMatcher>,
     succeed_always: bool,
 }
 
-impl<'a> ShapeMatcher2<'a> {
+impl<'a> HoldExpandedPatternShapeMatcher<'a> {
     #[inline]
     fn new(pattern: &'a HoldExpandedPattern) -> Self {
         assert!(!pattern.expanded_elements_vec.is_empty());
@@ -36,7 +36,7 @@ impl<'a> ShapeMatcher2<'a> {
         let candidates = pattern.expanded_elements_vec.iter()
             .enumerate()
             .filter(|(_, elements)| !elements.is_empty())
-            .map(|(p_index, _)| HoldExpandedPatternShapeMatcher {
+            .map(|(p_index, _)| HoldExpandedPatternCandidateShapeMatcher {
                 expanded_elements_vec_index: p_index,
                 stored: ArrayVec::new(),
                 current: Some(0),
@@ -49,10 +49,12 @@ impl<'a> ShapeMatcher2<'a> {
             succeed_always: false,
         }
     }
+}
 
+impl<'a> ShapeMatcher for HoldExpandedPatternShapeMatcher<'a> {
     /// Returns `true` if a remaining shape exists next.
     #[inline]
-    pub fn has_next(&self) -> bool {
+    fn has_next(&self) -> bool {
         !self.candidates.is_empty() && self.candidates.iter().any(|candidate| candidate.current.is_some())
     }
 
@@ -63,8 +65,7 @@ impl<'a> ShapeMatcher2<'a> {
     /// If the pattern has successfully matched until the end, the returned matcher will always return `true` regardless of the length of the sequence.
     /// For example, if the pattern represents "TSO", the sequence "TSOZ..." will also be considered `true`.
     /// Note that to take the length of the sequence into account, use `has_next()` as well.
-    #[inline]
-    pub fn match_shape(&self, target: Shape) -> (bool, ShapeMatcher2<'a>) {
+    fn match_shape(&self, target: Shape) -> (bool, HoldExpandedPatternShapeMatcher<'a>) {
         if self.succeed_always {
             return (true, self.clone());
         }
@@ -73,7 +74,7 @@ impl<'a> ShapeMatcher2<'a> {
             return (false, self.clone());
         }
 
-        let mut next_candidates = Vec::<HoldExpandedPatternShapeMatcher>::new();
+        let mut next_candidates = Vec::<HoldExpandedPatternCandidateShapeMatcher>::new();
         'loop_candidates: for candidate in &self.candidates {
             let expanded_pattern_element_index = if let Some(index) = candidate.current {
                 index
@@ -142,7 +143,7 @@ impl<'a> ShapeMatcher2<'a> {
                 }
             };
 
-            next_candidates.push(HoldExpandedPatternShapeMatcher {
+            next_candidates.push(HoldExpandedPatternCandidateShapeMatcher {
                 expanded_elements_vec_index: candidate.expanded_elements_vec_index,
                 stored: next_stored,
                 current: if expanded_pattern_element_index + 1 < self.pattern.expanded_elements_vec[candidate.expanded_elements_vec_index].len() {
@@ -167,7 +168,7 @@ impl<'a> ShapeMatcher2<'a> {
     }
 }
 
-impl<'a> From<&'a HoldExpandedPattern<'a>> for ShapeMatcher2<'a> {
+impl<'a> From<&'a HoldExpandedPattern<'a>> for HoldExpandedPatternShapeMatcher<'a> {
     fn from(pattern: &'a HoldExpandedPattern) -> Self {
         Self::new(pattern)
     }
@@ -178,7 +179,7 @@ impl<'a> From<&'a HoldExpandedPattern<'a>> for ShapeMatcher2<'a> {
 mod tests {
     use bitris::prelude::Shape;
 
-    use crate::{HoldExpandedPattern, Pattern, PatternElement};
+    use crate::{HoldExpandedPattern, Pattern, PatternElement, ShapeMatcher};
 
     #[test]
     fn matcher_case1() {
