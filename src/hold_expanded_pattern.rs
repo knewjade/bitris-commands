@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use bitris::prelude::*;
 
-use crate::{Pattern, PatternElement, HoldExpandedPatternShapeMatcher};
+use crate::{HoldExpandedPatternShapeMatcher, Pattern, PatternElement};
 
 /// Based on the pattern, it extends to the sequence obtained in the hold.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]

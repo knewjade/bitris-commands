@@ -203,7 +203,7 @@ fn use_the_executor_directly() {
     let allows_hold = true;
 
     let executor = PcPossibleBulkExecutor::try_new(
-        move_rules,
+        &move_rules,
         clipped_board,
         &pattern,
         allows_hold,

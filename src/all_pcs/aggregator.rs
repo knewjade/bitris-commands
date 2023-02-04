@@ -1,7 +1,7 @@
 use bitris::prelude::*;
 use fxhash::FxHashMap;
 
-use crate::{ClippedBoard, HoldExpandedPattern, Pattern, PatternShapeMatcher, ShapeCounter, ShapeMatcher};
+use crate::{ClippedBoard, HoldExpandedPattern, Pattern, ShapeCounter, ShapeMatcher};
 use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes};
 
 trait PcAggregationChecker {
