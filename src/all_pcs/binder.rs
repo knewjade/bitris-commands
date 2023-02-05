@@ -2,22 +2,9 @@ use std::rc::Rc;
 
 use bitris::prelude::*;
 use bitris::srs::SrsKickTable;
-use itertools::Itertools;
-use thiserror::Error;
 
-use crate::{ClippedBoard, Pattern, PatternCreationError, PatternElement, ShapeOrder};
-use crate::all_pcs::{AllPcsFromPatternExecutor, AllPcsFromPatternExecutorCreationError, PcSolutions};
-
-/// A collection of errors that occur when making the executor.
-#[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum AllPcsExecutorCreationError {
-    #[error("Unexpected the count of board spaces.")]
-    UnexpectedBoardSpaces,
-    #[error("The pattern is too short to take a PC.")]
-    ShortPatternDimension,
-    #[error("Board height exceeds the upper limit. Up to 56 are supported.")]
-    BoardIsTooHigh,
-}
+use crate::{ClippedBoard, ShapeOrder};
+use crate::all_pcs::{AllPcsExecutor, AllPcsExecutorCreationError, PcSolutions};
 
 /// The binder to hold and tie settings for `PcPossibleExecutor`.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
@@ -74,112 +61,17 @@ impl<T: RotationSystem> AllPcsExecutorBinder<T> {
 
     // TODO desc. See `AllPcsExecutorBinder::{try_new, execute}` for more details.
     pub fn try_execute(&self) -> Result<PcSolutions, AllPcsExecutorCreationError> {
-        use AllPcsFromPatternExecutorCreationError as FromError;
-        use AllPcsExecutorCreationError as ToError;
-
         let move_rules = MoveRules::new(self.rotation_system.as_ref(), self.allow_move);
-        let pattern = match Pattern::try_from(
-            self.shape_order.shapes().iter().map(|&shape| PatternElement::One(shape)).collect_vec()
-        ) {
-            Ok(pattern) => pattern,
-            Err(error) => return match error {
-                PatternCreationError::NoShapeSequences => Err(ToError::ShortPatternDimension),
-                PatternCreationError::ContainsInvalidPermutation => panic!("Unreachable assumption"),
-            },
-        };
-
-        self.try_bind(&move_rules, &pattern)
-            .map(|executor| {
-                executor.execute()
-            })
-            .map_err(|error| {
-                match error {
-                    FromError::UnexpectedBoardSpaces => ToError::UnexpectedBoardSpaces,
-                    FromError::ShortPatternDimension => ToError::ShortPatternDimension,
-                    FromError::BoardIsTooHigh => ToError::BoardIsTooHigh,
-                }
-            })
+        let executor = self.try_bind(&move_rules)?;
+        Ok(executor.execute())
     }
 
-    fn try_bind<'a>(&'a self, move_rules: &'a MoveRules<T>, pattern: &'a Pattern) -> Result<AllPcsFromPatternExecutor<T>, AllPcsFromPatternExecutorCreationError> {
-        AllPcsFromPatternExecutor::try_new(
+    fn try_bind<'a>(&'a self, move_rules: &'a MoveRules<T>) -> Result<AllPcsExecutor<T>, AllPcsExecutorCreationError> {
+        AllPcsExecutor::try_new(
             move_rules,
             self.clipped_board,
-            pattern,
+            self.shape_order.as_ref(),
             self.allows_hold,
         )
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use std::rc::Rc;
-    use std::str::FromStr;
-
-    use bitris::prelude::*;
-
-    use crate::{ClippedBoard, ShapeOrder};
-    use crate::pc_possible::{PcPossibleExecutorBinder, PcPossibleExecutorCreationError};
-
-    #[test]
-    fn reuse() {
-        use Shape::*;
-
-        let mut binder = PcPossibleExecutorBinder::srs();
-        let board = Board64::from_str("
-            ..........
-            ....####..
-            ....######
-            ....######
-        ").unwrap();
-        binder.clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-
-        binder.shape_order = Rc::new(ShapeOrder::new(vec![
-            I, O, T, Z, S, J, L,
-        ]));
-        assert!(binder.try_execute().unwrap());
-
-        binder.shape_order = Rc::new(ShapeOrder::new(vec![
-            Z, S, I, O, L, J, T,
-        ]));
-        assert!(!binder.try_execute().unwrap());
-    }
-
-    #[test]
-    fn error() {
-        use Shape::*;
-        use PcPossibleExecutorCreationError::*;
-
-        let mut binder = PcPossibleExecutorBinder::srs();
-        let board = Board64::from_str("
-            ..........
-            ....####.#
-            ....######
-            ....######
-        ").unwrap();
-        binder.clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-
-        binder.shape_order = Rc::new(ShapeOrder::new(vec![
-            Z, S, I, O, L, J, T,
-        ]));
-
-        assert_eq!(binder.try_execute().unwrap_err(), UnexpectedBoardSpaces);
-
-        let board = Board64::from_str("
-            ..........
-            ....####..
-            ....######
-            ....######
-        ").unwrap();
-        binder.clipped_board = ClippedBoard::try_new(board, 4).unwrap();
-
-        binder.shape_order = Rc::new(ShapeOrder::default());
-
-        assert_eq!(binder.try_execute().unwrap_err(), ShortOrderDimension);
-
-        binder.shape_order = Rc::new(ShapeOrder::new(vec![Z]));
-
-        assert_eq!(binder.try_execute().unwrap_err(), ShortOrderDimension);
     }
 }

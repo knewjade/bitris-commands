@@ -1,89 +1,11 @@
 use bitris::prelude::*;
 use fxhash::FxHashMap;
 
-use crate::{ClippedBoard, HoldExpandedPattern, Pattern, ShapeCounter, ShapeMatcher};
-use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes, PcSolutions};
+use crate::{ClippedBoard, HoldExpandedPattern, Pattern, ShapeCounter, ShapeOrder};
+use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes, PcSolutions, visit_all_dyn};
 
 trait PcAggregationChecker {
     fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>);
-}
-
-fn visit_all_dyn<'a, T: ShapeMatcher>(
-    initial_board: Board64,
-    refs: &Vec<&'a PlacedPieceBlocks>,
-    validator: impl Fn(&Board64, BlPlacement) -> SearchResult,
-    make_matcher: impl FnOnce() -> T,
-) -> Option<PlacedPieceBlocksFlow<'a>> {
-    if refs.is_empty() {
-        return None;
-    }
-
-    assert!(refs.len() < 64, "refs length supports up to 64.");
-
-    struct Builder<'a, 'b> {
-        refs: &'a Vec<&'b PlacedPieceBlocks>,
-        results: Vec<&'b PlacedPieceBlocks>,
-    }
-
-    impl Builder<'_, '_> {
-        fn build(
-            &mut self,
-            board: Board64,
-            remaining: u64,
-            matcher: impl ShapeMatcher,
-            validator: &impl Fn(&Board64, BlPlacement) -> SearchResult,
-        ) -> bool {
-            let mut candidates = remaining;
-            while 0 < candidates {
-                let next_candidates = candidates & (candidates - 1);
-                let bit = candidates - next_candidates;
-                let next_remaining = remaining - bit;
-
-                candidates = next_candidates;
-
-                let placed_piece_blocks = self.refs[bit.trailing_zeros() as usize];
-                let shape = placed_piece_blocks.placed_piece.piece.shape;
-                let (matched, next_matcher) = matcher.match_shape(shape);
-                if !matched {
-                    continue;
-                }
-
-                if let Some(placement) = placed_piece_blocks.place_according_to(board) {
-                    if validator(&board, placement) == SearchResult::Pruned {
-                        continue;
-                    }
-
-                    self.results.push(placed_piece_blocks);
-
-                    if next_remaining == 0 {
-                        return true;
-                    }
-
-                    let mut next_board = board;
-                    next_board.set_all(&placed_piece_blocks.locations);
-
-                    if self.build(next_board, next_remaining, next_matcher, validator) {
-                        return true;
-                    }
-                    self.results.pop();
-                }
-            }
-
-            false
-        }
-    }
-
-    let len = refs.len();
-    let mut builder = Builder {
-        refs,
-        results: Vec::with_capacity(len),
-    };
-
-    if builder.build(initial_board, (1u64 << len) - 1, make_matcher(), &validator) {
-        Some(PlacedPieceBlocksFlow::new(initial_board, builder.results))
-    } else {
-        None
-    }
 }
 
 pub(crate) struct Aggregator {
@@ -277,6 +199,51 @@ impl Aggregator {
             clipped_board: self.clipped_board,
             spawn_position: self.spawn_position,
             move_rules,
+            solutions: Vec::new(),
+        };
+
+        let mut results = Vec::with_capacity((self.clipped_board.spaces() / 4) as usize);
+        self.aggregate_recursively(self.nodes.head_index_id().unwrap(), &mut results, &mut checker);
+        PcSolutions::new(self.clipped_board, checker.solutions)
+    }
+
+    pub(crate) fn aggregate_with_sequence_order<T: RotationSystem>(&self, shape_order: &ShapeOrder, move_rules: &MoveRules<T>, allows_hold: bool) -> PcSolutions {
+        if self.nodes.indexes.is_empty() {
+            return PcSolutions::empty(self.clipped_board);
+        }
+
+        struct PcAggregationCheckerImpl<'a, T: RotationSystem> {
+            shape_order: &'a ShapeOrder,
+            clipped_board: ClippedBoard,
+            spawn_position: BlPosition,
+            move_rules: &'a MoveRules<'a, T>,
+            allows_hold: bool,
+            solutions: Vec<Vec<PlacedPiece>>,
+        }
+
+        impl<T: RotationSystem> PcAggregationChecker for PcAggregationCheckerImpl<'_, T> {
+            fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) {
+                let succeed = PlacedPieceBlocksFlow::find_one_stackable_by_order(
+                    self.clipped_board.board(),
+                    placed_piece_blocks_vec,
+                    self.shape_order.shapes(),
+                    self.allows_hold,
+                    self.move_rules,
+                    self.spawn_position,
+                );
+
+                if let Some(flow) = succeed {
+                    self.solutions.push(flow.refs.iter().map(|it| it.placed_piece).collect())
+                }
+            }
+        }
+
+        let mut checker = PcAggregationCheckerImpl {
+            shape_order,
+            clipped_board: self.clipped_board,
+            spawn_position: self.spawn_position,
+            move_rules,
+            allows_hold,
             solutions: Vec::new(),
         };
 

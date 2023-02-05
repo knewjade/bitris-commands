@@ -70,7 +70,7 @@ impl<'a, T: RotationSystem> AllPcsFromCountersExecutor<'a, T> {
                 prev.merge_by_max(shape_counter)
             });
 
-        let aggregator = Builder::new(self.clipped_board, max_shape_counter, 10)
+        let aggregator = Builder::new_and_make_placed_pieces(self.clipped_board, max_shape_counter, 10)
             .to_aggregator(self.spawn_position);
 
         aggregator.aggregate_with_shape_counters(self.shape_counters, &self.move_rules)

@@ -43,8 +43,7 @@ impl<'a, T: RotationSystem> AllPcsFromPatternExecutor<'a, T> {
             return Err(UnexpectedBoardSpaces);
         }
 
-        let dimension = pattern.dim_shapes() as u32;
-        if dimension < clipped_board.spaces() / 4 {
+        if (pattern.dim_shapes() as u32) < clipped_board.spaces() / 4 {
             return Err(ShortPatternDimension);
         }
 
@@ -64,7 +63,7 @@ impl<'a, T: RotationSystem> AllPcsFromPatternExecutor<'a, T> {
                 prev.merge_by_max(shape_counter)
             });
 
-        let aggregator = Builder::new(self.clipped_board, max_shape_counter, 10)
+        let aggregator = Builder::new_and_make_placed_pieces(self.clipped_board, max_shape_counter, 10)
             .to_aggregator(self.spawn_position);
 
         if self.allows_hold {

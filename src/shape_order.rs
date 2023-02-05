@@ -25,6 +25,11 @@ impl ShapeOrder {
     pub fn shapes(&self) -> &[Shape] {
         self.shapes.as_slice()
     }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.shapes.len()
+    }
 }
 
 impl From<&BitShapes> for ShapeOrder {

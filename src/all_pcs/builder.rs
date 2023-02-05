@@ -52,6 +52,16 @@ struct Frontier {
 impl Builder {
     pub(crate) fn new(
         clipped_board: ClippedBoard,
+        placed_pieces: Vec<PlacedPiece>,
+        available: ShapeCounter,
+        width: usize,
+    ) -> Self {
+        assert!(!placed_pieces.is_empty());
+        Self { clipped_board, placed_pieces, available, width }
+    }
+
+    pub(crate) fn new_and_make_placed_pieces(
+        clipped_board: ClippedBoard,
         available: ShapeCounter,
         width: usize,
     ) -> Self {
@@ -63,9 +73,7 @@ impl Builder {
                 it.locations().iter().all(|&location| board.is_free_at(location))
             })
             .collect();
-
-        assert!(!placed_pieces.is_empty());
-        Self { clipped_board, placed_pieces, available, width }
+        Self::new(clipped_board, placed_pieces, available, width)
     }
 
     pub(crate) fn to_aggregator(self, spawn_position: BlPosition) -> Aggregator {

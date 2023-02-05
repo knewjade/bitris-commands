@@ -89,9 +89,7 @@ impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
         };
 
         self.try_bind(&move_rules, &pattern)
-            .map(|executor| {
-                executor.execute_single()
-            })
+            .map(|executor| executor.execute_single())
             .map_err(|error| {
                 match error {
                     FromError::UnexpectedBoardSpaces => ToError::UnexpectedBoardSpaces,
