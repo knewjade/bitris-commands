@@ -1,8 +1,8 @@
 use bitris::prelude::*;
 use fxhash::FxHashMap;
 
-use crate::{ClippedBoard, HoldExpandedPattern, Pattern, ShapeCounter, ShapeOrder};
-use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes, PcSolutions, visit_all_dyn};
+use crate::{ClippedBoard, HoldExpandedPattern, Pattern, ShapeCounter, ShapeMatcher, ShapeOrder};
+use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes, PcSolutions};
 
 trait PcAggregationChecker {
     fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>);
@@ -113,7 +113,7 @@ impl Aggregator {
                     return;
                 }
 
-                let succeed = visit_all_dyn(
+                let succeed = PlacedPieceBlocksFlow::find_one_dyn(
                     self.clipped_board.board(),
                     placed_piece_blocks_vec,
                     |board, placement| {
@@ -123,9 +123,16 @@ impl Aggregator {
                         }
                         SearchResult::Pruned
                     },
-                    || self.hold_extended_pattern.new_matcher(),
+                    self.hold_extended_pattern.new_matcher(),
+                    |prev, current| {
+                        let shape = current.placed_piece.piece.shape;
+                        let (matched, next_matcher) = prev.match_shape(shape);
+                        if !matched {
+                            return None;
+                        }
+                        Some(next_matcher)
+                    },
                 );
-
                 if let Some(flow) = succeed {
                     self.solutions.push(flow.refs.iter().map(|it| it.placed_piece).collect())
                 }
@@ -174,7 +181,7 @@ impl Aggregator {
                     return;
                 }
 
-                let succeed = visit_all_dyn(
+                let succeed = PlacedPieceBlocksFlow::find_one_dyn(
                     self.clipped_board.board(),
                     placed_piece_blocks_vec,
                     |board, placement| {
@@ -184,7 +191,15 @@ impl Aggregator {
                         }
                         SearchResult::Pruned
                     },
-                    || self.pattern.new_matcher(),
+                    self.pattern.new_matcher(),
+                    |prev, current| {
+                        let shape = current.placed_piece.piece.shape;
+                        let (matched, next_matcher) = prev.match_shape(shape);
+                        if !matched {
+                            return None;
+                        }
+                        Some(next_matcher)
+                    },
                 );
 
                 if let Some(flow) = succeed {

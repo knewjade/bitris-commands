@@ -17,7 +17,7 @@ pub enum AllPcsFromCountersExecutorCreationError {
     CountersAreEmpty,
 }
 
-/// The executor to find PC possibles.
+/// The executor to find all PCs.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub struct AllPcsFromCountersExecutor<'a, T: RotationSystem> {
     move_rules: &'a MoveRules<'a, T>,
@@ -27,7 +27,37 @@ pub struct AllPcsFromCountersExecutor<'a, T: RotationSystem> {
 }
 
 impl<'a, T: RotationSystem> AllPcsFromCountersExecutor<'a, T> {
-    // TODO desc
+    /// Make AllPcsFromCountersExecutor.
+    ///
+    /// Returns `Err()` if the setting is incorrect or restricted.
+    /// See `AllPcsFromCountersExecutorCreationError` for error cases.
+    /// ```
+    /// use std::str::FromStr;
+    /// use bitris::prelude::*;
+    /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeOrder};
+    /// use bitris_commands::all_pcs::AllPcsFromCountersExecutor;
+    ///
+    /// let move_rules = MoveRules::srs(AllowMove::Softdrop);
+    ///
+    /// let board = Board64::from_str("
+    ///     XXX.....XX
+    ///     XXX....XXX
+    ///     XXX...XXXX
+    ///     XXX....XXX
+    /// ").expect("Failed to create a board");
+    /// let height = 4;
+    /// let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
+    ///
+    /// let shape_counters = vec![
+    ///     ShapeCounter::from(vec![Shape::T, Shape::O, Shape::I, Shape::J, Shape::L]),
+    /// ];
+    ///
+    /// let executor = AllPcsFromCountersExecutor::try_new(&move_rules, clipped_board, &shape_counters)
+    ///     .expect("Failed to create an executor");
+    ///
+    /// let solutions = executor.execute();
+    /// assert_eq!(solutions.len(), 10);
+    /// ```
     pub fn try_new(
         move_rules: &'a MoveRules<'a, T>,
         clipped_board: ClippedBoard,
@@ -63,7 +93,7 @@ impl<'a, T: RotationSystem> AllPcsFromCountersExecutor<'a, T> {
         Ok(Self { move_rules, clipped_board, shape_counters, spawn_position })
     }
 
-    /// TODO desc Start the search for PC possible in bulk.
+    /// Start the search for all PCs.
     pub fn execute(&self) -> PcSolutions {
         let max_shape_counter = self.shape_counters.iter()
             .fold(ShapeCounter::empty(), |prev, shape_counter| {

@@ -4,11 +4,11 @@ mod tests {
     use std::str::FromStr;
     use std::time::Instant;
 
-    use bitris_commands::all_pcs::{AllPcsExecutorBinder, AllPcsFromCountersExecutorBinder, AllPcsFromPatternExecutorBinder};
+    use bitris_commands::all_pcs::{AllPcsFromCountersExecutorBinder, AllPcsFromOrderExecutorBinder, AllPcsFromPatternExecutorBinder};
     use bitris_commands::prelude::*;
 
     #[test]
-    fn single() {
+    fn from_order() {
         use Shape::*;
 
         struct TestingData {
@@ -16,7 +16,7 @@ mod tests {
             clipped_board: ClippedBoard,
             // (allow move, allows hold, result)
             expected: Vec<(AllowMove, bool, usize)>,
-            generator: fn() -> AllPcsExecutorBinder<SrsKickTable>,
+            generator: fn() -> AllPcsFromOrderExecutorBinder<SrsKickTable>,
         }
 
         let testings = vec![
@@ -29,7 +29,7 @@ mod tests {
                     ######....
                 ").unwrap(), 4).unwrap(),
                 generator: || {
-                    let mut binder = AllPcsExecutorBinder::srs();
+                    let mut binder = AllPcsFromOrderExecutorBinder::srs();
 
                     binder.shape_order = Rc::new(vec![S, I, T, J].into());
 
@@ -51,7 +51,7 @@ mod tests {
                     ######....
                 ").unwrap(), 4).unwrap(),
                 generator: || {
-                    let mut binder = AllPcsExecutorBinder::srs();
+                    let mut binder = AllPcsFromOrderExecutorBinder::srs();
 
                     binder.shape_order = Rc::new(vec![S, T, J, O].into());
 
@@ -62,6 +62,20 @@ mod tests {
                     (AllowMove::Harddrop, true, 0),
                     (AllowMove::Softdrop, false, 0),
                     (AllowMove::Harddrop, false, 0),
+                ],
+            },
+            TestingData {
+                id: format!("empty-extra"),
+                clipped_board: ClippedBoard::try_new(Board64::blank(), 4).unwrap(),
+                generator: || {
+                    let mut binder = AllPcsFromOrderExecutorBinder::srs();
+
+                    binder.shape_order = Rc::new(vec![T, L, J, I, O, S, Z, L, J, T, O].into());
+
+                    binder
+                },
+                expected: vec![
+                    (AllowMove::Softdrop, true, 8272),
                 ],
             },
         ];

@@ -2,7 +2,7 @@ use bitris::prelude::*;
 
 use crate::ClippedBoard;
 
-// TODO
+#[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub struct PcSolutions {
     clipped_board: ClippedBoard,
     placed_pieces: Vec<Vec<PlacedPiece>>,

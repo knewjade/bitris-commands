@@ -6,7 +6,18 @@ use bitris_commands::all_pcs;
 use bitris_commands::prelude::*;
 
 #[inline(always)]
-fn all_pcs_from_counters(data: &AllPcsFromShapeCounterBenchmarkData) {
+fn all_pcs_from_order(data: &AllPcsFromOrderBenchmarkData) {
+    let move_rules = MoveRules::srs(data.allow_move);
+    let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
+    let executor = all_pcs::AllPcsFromOrderExecutor::try_new(
+        &move_rules, clipped_board, &data.shape_order, data.allows_hold,
+    ).unwrap();
+    let result = executor.execute();
+    assert_eq!(result.len(), data.expected);
+}
+
+#[inline(always)]
+fn all_pcs_from_counters(data: &AllPcsFromCounterBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
     let executor = all_pcs::AllPcsFromCountersExecutor::try_new(
@@ -28,7 +39,74 @@ fn all_pcs_from_pattern(data: &AllPcsFromPatternBenchmarkData) {
 }
 
 #[derive(Debug)]
-struct AllPcsFromShapeCounterBenchmarkData {
+struct AllPcsFromOrderBenchmarkData {
+    id: String,
+    board: Board64,
+    height: u32,
+    shape_order: ShapeOrder,
+    allow_move: AllowMove,
+    allows_hold: bool,
+    expected: usize,
+}
+
+fn bench_all_pcs_from_order(c: &mut Criterion) {
+    use Shape::*;
+    let benchmarks = vec![
+        AllPcsFromOrderBenchmarkData {
+            id: format!("pco-tlj"),
+            board: Board64::from_str(
+                "
+                ####....##
+                ####...###
+                ####..####
+                ####...###
+            ").unwrap(),
+            height: 4,
+            shape_order: vec![T, L, J].into(),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
+            expected: 1,
+        },
+        AllPcsFromOrderBenchmarkData {
+            id: format!("piece7-hold"),
+            board: Board64::from_str("
+                ####......
+                ####......
+                ####......
+                ####......
+            ").unwrap(),
+            height: 4,
+            shape_order: vec![T, O, Z, L, J, T, O].into(),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
+            expected: 11,
+        },
+        AllPcsFromOrderBenchmarkData {
+            id: format!("piece6-no-hold"),
+            board: Board64::from_str("
+                ####......
+                ####......
+                ####......
+                ####......
+            ").unwrap(),
+            height: 4,
+            shape_order: vec![T, L, J, T, Z, O].into(),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: false,
+            expected: 3,
+        },
+    ];
+
+    benchmarks.iter().for_each(|benchmark| {
+        let id = format!("all-pcs-from-order-{}", benchmark.id);
+        c.bench_function(id.as_str(), |b| {
+            b.iter(|| all_pcs_from_order(black_box(benchmark)));
+        });
+    });
+}
+
+#[derive(Debug)]
+struct AllPcsFromCounterBenchmarkData {
     id: String,
     board: Board64,
     height: u32,
@@ -39,7 +117,7 @@ struct AllPcsFromShapeCounterBenchmarkData {
 
 fn bench_all_pcs_from_counters(c: &mut Criterion) {
     let benchmarks = vec![
-        AllPcsFromShapeCounterBenchmarkData {
+        AllPcsFromCounterBenchmarkData {
             id: format!("pco-wildcard3"),
             board: Board64::from_str(
                 "
@@ -55,7 +133,7 @@ fn bench_all_pcs_from_counters(c: &mut Criterion) {
             allow_move: AllowMove::Softdrop,
             expected: 28,
         },
-        AllPcsFromShapeCounterBenchmarkData {
+        AllPcsFromCounterBenchmarkData {
             id: format!("wildcard3"),
             board: Board64::from_str(
                 "
@@ -71,7 +149,7 @@ fn bench_all_pcs_from_counters(c: &mut Criterion) {
             allow_move: AllowMove::Softdrop,
             expected: 79,
         },
-        AllPcsFromShapeCounterBenchmarkData {
+        AllPcsFromCounterBenchmarkData {
             id: format!("wildcard6"),
             board: Board64::from_str(
                 "
@@ -157,5 +235,5 @@ fn bench_all_pcs_from_pattern(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_all_pcs_from_counters, bench_all_pcs_from_pattern);
+criterion_group!(benches, bench_all_pcs_from_order, bench_all_pcs_from_counters, bench_all_pcs_from_pattern);
 criterion_main!(benches);

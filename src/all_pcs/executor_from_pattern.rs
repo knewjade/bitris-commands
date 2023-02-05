@@ -15,7 +15,7 @@ pub enum AllPcsFromPatternExecutorCreationError {
     BoardIsTooHigh,
 }
 
-/// The executor to find PC possibles.
+/// The executor to find all PCs.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
 pub struct AllPcsFromPatternExecutor<'a, T: RotationSystem> {
     move_rules: &'a MoveRules<'a, T>,
@@ -26,7 +26,40 @@ pub struct AllPcsFromPatternExecutor<'a, T: RotationSystem> {
 }
 
 impl<'a, T: RotationSystem> AllPcsFromPatternExecutor<'a, T> {
-    // TODO desc
+    /// Make AllPcsFromPatternExecutor.
+    ///
+    /// Returns `Err()` if the setting is incorrect or restricted.
+    /// See `AllPcsFromPatternExecutor` for error cases.
+    /// ```
+    /// use std::str::FromStr;
+    /// use bitris::prelude::*;
+    /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeOrder};
+    /// use bitris_commands::all_pcs::AllPcsFromPatternExecutor;
+    ///
+    /// let move_rules = MoveRules::srs(AllowMove::Softdrop);
+    ///
+    /// let board = Board64::from_str("
+    ///     XXX.....XX
+    ///     XXX....XXX
+    ///     XXX...XXXX
+    ///     XXX....XXX
+    /// ").expect("Failed to create a board");
+    /// let height = 4;
+    /// let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
+    ///
+    /// let pattern = Pattern::try_new(vec![
+    ///     PatternElement::One(Shape::I),
+    ///     PatternElement::Permutation(vec![Shape::T, Shape::O, Shape::J, Shape::L].into(), 3),
+    /// ]).unwrap();
+    ///
+    /// let allows_hold = true;
+    ///
+    /// let executor = AllPcsFromPatternExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
+    ///     .expect("Failed to create an executor");
+    ///
+    /// let solutions = executor.execute();
+    /// assert_eq!(solutions.len(), 10);
+    /// ```
     pub fn try_new(
         move_rules: &'a MoveRules<'a, T>,
         clipped_board: ClippedBoard,
@@ -55,7 +88,7 @@ impl<'a, T: RotationSystem> AllPcsFromPatternExecutor<'a, T> {
         Ok(Self { move_rules, clipped_board, pattern, spawn_position, allows_hold })
     }
 
-    /// TODO desc Start the search for PC possible in bulk.
+    /// Start the search for all PCs.
     pub fn execute(&self) -> PcSolutions {
         let shape_counters = self.pattern.to_shape_counter_vec();
         let max_shape_counter = shape_counters.iter()

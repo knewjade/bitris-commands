@@ -77,3 +77,81 @@ impl<T: RotationSystem> AllPcsFromPatternExecutorBinder<T> {
         )
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+    use std::str::FromStr;
+
+    use bitris::prelude::*;
+
+    use crate::{ClippedBoard, Pattern, ShapeCounter};
+    use crate::all_pcs::{AllPcsFromPatternExecutorBinder, AllPcsFromPatternExecutorCreationError};
+    use crate::PatternElement::{Factorial, One, Permutation};
+
+    #[test]
+    fn reuse() {
+        use Shape::*;
+
+        let mut binder = AllPcsFromPatternExecutorBinder::srs();
+        let board = Board64::from_str("
+            ..........
+            ....####..
+            ....######
+            ....######
+        ").unwrap();
+        binder.clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+
+        binder.pattern = Rc::new(Pattern::try_new(vec![
+            One(S),
+            One(Z),
+            Factorial(vec![O, I, L, J].into()),
+        ]).unwrap());
+        let solutions = binder.try_execute().unwrap();
+        assert_eq!(solutions.len(), 0);
+
+        binder.pattern = Rc::new(Pattern::try_new(vec![
+            One(S),
+            One(Z),
+            Permutation(vec![T, O, I, L, J].into(), 4),
+        ]).unwrap());
+        let solutions = binder.try_execute().unwrap();
+        assert_eq!(solutions.len(), 4);
+    }
+
+    #[test]
+    fn error() {
+        use Shape::*;
+        use AllPcsFromPatternExecutorCreationError::*;
+
+        let mut binder = AllPcsFromPatternExecutorBinder::srs();
+        let board = Board64::from_str("
+            ..........
+            ....####.#
+            ....######
+            ....######
+        ").unwrap();
+        binder.clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+
+        binder.pattern = Rc::new(Pattern::try_new(vec![
+            Factorial(ShapeCounter::one_of_each()),
+        ]).unwrap());
+
+        assert_eq!(binder.try_execute().unwrap_err(), UnexpectedBoardSpaces);
+
+        let board = Board64::from_str("
+            ..........
+            ....####..
+            ....######
+            ....######
+        ").unwrap();
+        binder.clipped_board = ClippedBoard::try_new(board, 4).unwrap();
+
+        binder.pattern = Rc::new(Pattern::try_new(vec![
+            One(S),
+        ]).unwrap());
+
+        assert_eq!(binder.try_execute().unwrap_err(), ShortPatternDimension);
+    }
+}

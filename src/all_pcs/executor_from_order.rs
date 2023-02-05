@@ -6,7 +6,7 @@ use crate::all_pcs::{Builder, PcSolutions};
 
 /// A collection of errors that occur when making the executor.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum AllPcsExecutorCreationError {
+pub enum AllPcsFromOrderExecutorCreationError {
     #[error("Unexpected the count of board spaces.")]
     UnexpectedBoardSpaces,
     #[error("The pattern is too short to take a PC.")]
@@ -15,9 +15,9 @@ pub enum AllPcsExecutorCreationError {
     BoardIsTooHigh,
 }
 
-/// The executor to find PC possibles.
+/// The executor to find all PCs.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub struct AllPcsExecutor<'a, T: RotationSystem> {
+pub struct AllPcsFromOrderExecutor<'a, T: RotationSystem> {
     move_rules: &'a MoveRules<'a, T>,
     clipped_board: ClippedBoard,
     shape_order: &'a ShapeOrder,
@@ -25,15 +25,47 @@ pub struct AllPcsExecutor<'a, T: RotationSystem> {
     allows_hold: bool,
 }
 
-impl<'a, T: RotationSystem> AllPcsExecutor<'a, T> {
-    // TODO desc
+impl<'a, T: RotationSystem> AllPcsFromOrderExecutor<'a, T> {
+    /// Make AllPcsFromOrderExecutor.
+    ///
+    /// Returns `Err()` if the setting is incorrect or restricted.
+    /// See `AllPcsFromOrderExecutorCreationError` for error cases.
+    /// ```
+    /// use std::str::FromStr;
+    /// use bitris::prelude::*;
+    /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeOrder};
+    /// use bitris_commands::all_pcs::AllPcsFromOrderExecutor;
+    ///
+    /// let move_rules = MoveRules::srs(AllowMove::Softdrop);
+    ///
+    /// let board = Board64::from_str("
+    ///     XXX.....XX
+    ///     XXX....XXX
+    ///     XXX...XXXX
+    ///     XXX....XXX
+    /// ").expect("Failed to create a board");
+    /// let height = 4;
+    /// let clipped_board = ClippedBoard::try_new(board, height).expect("Failed to clip");
+    ///
+    /// let shape_order = ShapeOrder::new(vec![
+    ///     Shape::I, Shape::T, Shape::S, Shape::Z,
+    /// ]);
+    ///
+    /// let allows_hold = true;
+    ///
+    /// let executor = AllPcsFromOrderExecutor::try_new(&move_rules, clipped_board, &shape_order, allows_hold)
+    ///     .expect("Failed to create an executor");
+    ///
+    /// let solutions = executor.execute();
+    /// assert_eq!(solutions.len(), 2);
+    /// ```
     pub fn try_new(
         move_rules: &'a MoveRules<'a, T>,
         clipped_board: ClippedBoard,
         shape_order: &'a ShapeOrder,
         allows_hold: bool,
-    ) -> Result<Self, AllPcsExecutorCreationError> {
-        use AllPcsExecutorCreationError::*;
+    ) -> Result<Self, AllPcsFromOrderExecutorCreationError> {
+        use AllPcsFromOrderExecutorCreationError::*;
 
         if 20 < clipped_board.height() {
             return Err(BoardIsTooHigh);
@@ -55,7 +87,7 @@ impl<'a, T: RotationSystem> AllPcsExecutor<'a, T> {
         Ok(Self { move_rules, clipped_board, shape_order, spawn_position, allows_hold })
     }
 
-    /// TODO desc Start the search for PC possible in bulk.
+    /// Start the search for all PCs.
     pub fn execute(&self) -> PcSolutions {
         let shape_counter: ShapeCounter = self.shape_order.shapes().into();
 
