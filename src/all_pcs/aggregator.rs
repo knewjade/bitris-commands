@@ -2,7 +2,7 @@ use bitris::prelude::*;
 use fxhash::FxHashMap;
 
 use crate::{ClippedBoard, HoldExpandedPattern, Pattern, ShapeCounter, ShapeMatcher};
-use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes};
+use crate::all_pcs::{IndexId, IndexNode, ItemId, Nodes, PcSolutions};
 
 trait PcAggregationChecker {
     fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>);
@@ -94,24 +94,6 @@ pub(crate) struct Aggregator {
     goal_board: Board64,
 }
 
-// TODO
-pub struct PcSolutions {
-    clipped_board: ClippedBoard,
-    placed_pieces: Vec<Vec<PlacedPiece>>,
-}
-
-impl PcSolutions {
-    #[inline]
-    pub fn empty(clipped_board: ClippedBoard) -> Self {
-        Self { clipped_board, placed_pieces: Vec::new() }
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.placed_pieces.len()
-    }
-}
-
 impl Aggregator {
     pub(crate) fn new(
         clipped_board: ClippedBoard,
@@ -178,10 +160,7 @@ impl Aggregator {
 
         let mut results = Vec::with_capacity((self.clipped_board.spaces() / 4) as usize);
         self.aggregate_recursively(self.nodes.head_index_id().unwrap(), &mut results, &mut checker);
-        PcSolutions {
-            clipped_board: self.clipped_board,
-            placed_pieces: checker.solutions,
-        }
+        PcSolutions::new(self.clipped_board, checker.solutions)
     }
 
     pub(crate) fn aggregate_with_pattern_allows_hold<T: RotationSystem>(&self, pattern: &Pattern, move_rules: &MoveRules<T>) -> PcSolutions {
@@ -200,7 +179,7 @@ impl Aggregator {
             solutions: Vec<Vec<PlacedPiece>>,
         }
 
-        impl <T: RotationSystem> PcAggregationChecker for PcAggregationCheckerImpl<'_, T> {
+        impl<T: RotationSystem> PcAggregationChecker for PcAggregationCheckerImpl<'_, T> {
             fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) {
                 let succeed = {
                     let shape_counter: ShapeCounter = placed_piece_blocks_vec.iter()
@@ -242,10 +221,7 @@ impl Aggregator {
 
         let mut results = Vec::with_capacity((self.clipped_board.spaces() / 4) as usize);
         self.aggregate_recursively(self.nodes.head_index_id().unwrap(), &mut results, &mut checker);
-        PcSolutions {
-            clipped_board: self.clipped_board,
-            placed_pieces: checker.solutions,
-        }
+        PcSolutions::new(self.clipped_board, checker.solutions)
     }
 
     pub(crate) fn aggregate_with_pattern_allows_no_hold<T: RotationSystem>(&self, pattern: &Pattern, move_rules: &MoveRules<T>) -> PcSolutions {
@@ -264,7 +240,7 @@ impl Aggregator {
             solutions: Vec<Vec<PlacedPiece>>,
         }
 
-        impl <T: RotationSystem> PcAggregationChecker for PcAggregationCheckerImpl<'_, T> {
+        impl<T: RotationSystem> PcAggregationChecker for PcAggregationCheckerImpl<'_, T> {
             fn save_if_need(&mut self, placed_piece_blocks_vec: &Vec<&PlacedPieceBlocks>) {
                 let succeed = {
                     let shape_counter: ShapeCounter = placed_piece_blocks_vec.iter()
@@ -306,10 +282,7 @@ impl Aggregator {
 
         let mut results = Vec::with_capacity((self.clipped_board.spaces() / 4) as usize);
         self.aggregate_recursively(self.nodes.head_index_id().unwrap(), &mut results, &mut checker);
-        PcSolutions {
-            clipped_board: self.clipped_board,
-            placed_pieces: checker.solutions,
-        }
+        PcSolutions::new(self.clipped_board, checker.solutions)
     }
 
     fn aggregate_recursively<'a>(

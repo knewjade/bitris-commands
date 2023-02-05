@@ -2,36 +2,104 @@
 mod tests {
     use std::rc::Rc;
     use std::str::FromStr;
+    use std::time::Instant;
 
     use bitris_commands::pc_possible::*;
     use bitris_commands::prelude::*;
 
-    struct PcPossibleTestingData {
-        id: String,
-        succeed: u64,
-        accepted: u64,
-        generator: fn() -> PcPossibleBulkExecutorBinder<SrsKickTable>,
+    #[test]
+    fn single() {
+        use Shape::*;
+
+        struct TestingData {
+            id: String,
+            clipped_board: ClippedBoard,
+            // (shape order, allow move, allows hold, result)
+            expected: Vec<(Vec<Shape>, AllowMove, bool, bool)>,
+            generator: fn() -> PcPossibleExecutorBinder<SrsKickTable>,
+        }
+
+        let testings = vec![
+            TestingData {
+                id: format!("pco-just"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    ###.....##
+                    ###....###
+                    ###...####
+                    ###....###
+                ").unwrap(), 4).unwrap(),
+                generator: || PcPossibleExecutorBinder::srs(),
+                expected: vec![
+                    (vec![I, L, T, J], AllowMove::Softdrop, true, true),
+                    (vec![I, L, J, T], AllowMove::Softdrop, false, false),
+                    (vec![I, L, T, J], AllowMove::Harddrop, true, true),
+                    (vec![I, L, T, J], AllowMove::Harddrop, false, false),
+                ],
+            },
+            TestingData {
+                id: format!("4th-extra"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    .....##...
+                    ......##..
+                    ##...##...
+                    ##..######
+                ").unwrap(), 4).unwrap(),
+                generator: || PcPossibleExecutorBinder::srs(),
+                expected: vec![
+                    (vec![O, I, S, S, T, Z, L], AllowMove::Softdrop, true, false),
+                    (vec![O, I, S, S, L, Z, J], AllowMove::Softdrop, true, true),
+                    (vec![O, I, S, S, L, Z, J], AllowMove::Softdrop, false, false),
+                    (vec![O, I, S, S, L, Z, J], AllowMove::Harddrop, true, false),
+                ],
+            },
+        ];
+
+        for testing in testings {
+            println!("id: {}", testing.id);
+
+            let mut binder = (testing.generator)();
+            binder.clipped_board = testing.clipped_board;
+
+            for (shapes, allow_move, allows_hold, succeed) in testing.expected {
+                binder.shape_order = Rc::new(ShapeOrder::new(shapes));
+                binder.allow_move = allow_move;
+                binder.allows_hold = allows_hold;
+
+                let start = Instant::now();
+                let result = binder.try_execute().unwrap();
+                let end = start.elapsed();
+                println!("  {}, hold {}: {} μs", allow_move, allows_hold, end.as_micros());
+
+                assert_eq!(result, succeed);
+            }
+        }
     }
 
     #[test]
-    fn srs() {
+    fn bulk() {
         use PatternElement::*;
         use Shape::*;
 
-        let benchmarks = vec![
-            PcPossibleTestingData {
-                id: format!("1st-ILSZ-hold"),
+        struct TestingData {
+            id: String,
+            clipped_board: ClippedBoard,
+            accepted: u64,
+            // (allow move, allows hold, succeed)
+            expected: Vec<(AllowMove, bool, u64)>,
+            generator: fn() -> PcPossibleBulkExecutorBinder<SrsKickTable>,
+        }
+
+        let testings = vec![
+            TestingData {
+                id: format!("1st-ILSZ-extra"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    #......###
+                    #.......##
+                    #.....####
+                    #......###
+                ").unwrap(), 4).unwrap(),
                 generator: || {
                     let mut binder = PcPossibleBulkExecutorBinder::srs();
-
-                    let board = Board64::from_str("
-                        #......###
-                        #.......##
-                        #.....####
-                        #......###
-                    ").unwrap();
-                    let height = 4;
-                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
                     binder.pattern = Rc::from(Pattern::try_from(vec![
                         Factorial(ShapeCounter::try_from(vec![
@@ -40,26 +108,24 @@ mod tests {
                         Permutation(ShapeCounter::one_of_each(), 4),
                     ]).unwrap());
 
-                    binder.allows_hold = true;
-
                     binder
                 },
-                succeed: 5040,
                 accepted: 5040,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 5040),
+                    (AllowMove::Harddrop, true, 1220),
+                ],
             },
-            PcPossibleTestingData {
-                id: format!("1st-ILSZ-no-hold"),
+            TestingData {
+                id: format!("1st-ILSZ-just"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    #......###
+                    #.......##
+                    #.....####
+                    #......###
+                ").unwrap(), 4).unwrap(),
                 generator: || {
                     let mut binder = PcPossibleBulkExecutorBinder::srs();
-
-                    let board = Board64::from_str("
-                        #......###
-                        #.......##
-                        #.....####
-                        #......###
-                    ").unwrap();
-                    let height = 4;
-                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
                     binder.pattern = Rc::from(Pattern::try_from(vec![
                         Factorial(ShapeCounter::try_from(vec![
@@ -68,26 +134,26 @@ mod tests {
                         Permutation(ShapeCounter::one_of_each(), 3),
                     ]).unwrap());
 
-                    binder.allows_hold = false;
-
                     binder
                 },
-                succeed: 523,
                 accepted: 1260,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 1188),
+                    (AllowMove::Harddrop, true, 240),
+                    (AllowMove::Softdrop, false, 523),
+                    (AllowMove::Harddrop, false, 18),
+                ],
             },
-            PcPossibleTestingData {
-                id: format!("1st-grace-system-hold"),
+            TestingData {
+                id: format!("1st-grace-system-extra"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    ######....
+                    ######....
+                    ######....
+                    ######....
+                ").unwrap(), 4).unwrap(),
                 generator: || {
                     let mut binder = PcPossibleBulkExecutorBinder::srs();
-
-                    let board = Board64::from_str("
-                        ######....
-                        ######....
-                        ######....
-                        ######....
-                    ").unwrap();
-                    let height = 4;
-                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
                     binder.pattern = Rc::from(Pattern::try_from(vec![
                         One(T),
@@ -96,56 +162,91 @@ mod tests {
 
                     binder
                 },
-                succeed: 744,
                 accepted: 840,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 744),
+                    (AllowMove::Harddrop, true, 634),
+                ],
             },
-            PcPossibleTestingData {
-                id: format!("1st-grace-system-no-hold"),
+            TestingData {
+                id: format!("1st-grace-system-just"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    ######....
+                    ######....
+                    ######....
+                    ######....
+                ").unwrap(), 4).unwrap(),
                 generator: || {
                     let mut binder = PcPossibleBulkExecutorBinder::srs();
-
-                    let board = Board64::from_str("
-                        ######....
-                        ######....
-                        ######....
-                        ######....
-                    ").unwrap();
-                    let height = 4;
-                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
 
                     binder.pattern = Rc::from(Pattern::try_from(vec![
                         One(T),
                         Permutation(ShapeCounter::one_of_each(), 3),
                     ]).unwrap());
 
-                    binder.allows_hold = false;
-
                     binder
                 },
-                succeed: 67,
                 accepted: 210,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 138),
+                    (AllowMove::Harddrop, true, 100),
+                    (AllowMove::Softdrop, false, 67),
+                    (AllowMove::Harddrop, false, 37),
+                ],
             },
-            PcPossibleTestingData {
-                id: format!("2nd-LSZT"),
+            TestingData {
+                id: format!("2nd-LSZT-extra"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    #.........
+                    ##...#....
+                    ######....
+                    ######....
+                ").unwrap(), 4).unwrap(),
                 generator: || {
                     let mut binder = PcPossibleBulkExecutorBinder::srs();
 
-                    let board = Board64::from_str("
-                        #.........
-                        ##...#....
-                        ######....
-                        ######....
-                    ").unwrap();
-                    let height = 4;
-                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
+                        One(T),
+                        Permutation(ShapeCounter::one_of_each(), 6),
+                    ]).unwrap());
 
                     binder
                 },
-                succeed: 5028,
                 accepted: 5040,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 4952),
+                    (AllowMove::Harddrop, true, 3976),
+                ],
             },
-            PcPossibleTestingData {
-                id: format!("empty"),
+            TestingData {
+                id: format!("2nd-LSZT-just"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    #.........
+                    ##...#....
+                    ######....
+                    ######....
+                ").unwrap(), 4).unwrap(),
+                generator: || {
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
+
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
+                        One(T),
+                        Permutation(ShapeCounter::one_of_each(), 5),
+                    ]).unwrap());
+
+                    binder
+                },
+                accepted: 2520,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 1812),
+                    (AllowMove::Harddrop, true, 1266),
+                    (AllowMove::Softdrop, false, 992),
+                    (AllowMove::Harddrop, false, 144),
+                ],
+            },
+            TestingData {
+                id: format!("empty-extra"),
+                clipped_board: ClippedBoard::try_new(Board64::blank(), 4).unwrap(),
                 generator: || {
                     let mut binder = PcPossibleBulkExecutorBinder::srs();
 
@@ -156,100 +257,107 @@ mod tests {
                         Wildcard, // I or O is not PC-able
                     ]).unwrap());
 
-                    binder.allows_hold = true;
-
                     binder
                 },
-                succeed: 5,
                 accepted: 7,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 5),
+                    (AllowMove::Harddrop, true, 3),
+                ],
             },
-            PcPossibleTestingData {
-                id: format!("harddrop-only"),
+            TestingData {
+                id: format!("empty-just"),
+                clipped_board: ClippedBoard::try_new(Board64::blank(), 4).unwrap(),
                 generator: || {
                     let mut binder = PcPossibleBulkExecutorBinder::srs();
 
-                    let board = Board64::from_str("
-                        ######....
-                        ######....
-                        ######....
-                        ######....
-                    ").unwrap();
-                    let height = 4;
-                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
+                        Fixed(BitShapes::try_from(vec![
+                            S, L, Z, O, S, L, S, J, O,
+                        ]).unwrap()),
+                        Wildcard, // I or O is not PC-able
+                    ]).unwrap());
+
+                    binder
+                },
+                accepted: 7,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 3),
+                    (AllowMove::Harddrop, true, 3),
+                    (AllowMove::Softdrop, false, 2),
+                    (AllowMove::Harddrop, false, 2),
+                ],
+            },
+            TestingData {
+                id: format!("4th-L-extra"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    ........##
+                    .......###
+                    ##....####
+                    ##.....###
+                ").unwrap(), 4).unwrap(),
+                generator: || {
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
 
                     binder.pattern = Rc::from(Pattern::try_from(vec![
+                        One(L),
+                        Permutation(ShapeCounter::one_of_each(), 6),
+                    ]).unwrap());
+
+                    binder
+                },
+                accepted: 5040,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 5011),
+                    (AllowMove::Harddrop, true, 3055),
+                ],
+            },
+            TestingData {
+                id: format!("4th-L-just"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    ........##
+                    .......###
+                    ##....####
+                    ##.....###
+                ").unwrap(), 4).unwrap(),
+                generator: || {
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
+
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
+                        One(L),
                         Permutation(ShapeCounter::one_of_each(), 5),
                     ]).unwrap());
 
-                    binder.allow_move = AllowMove::Harddrop;
-
                     binder
                 },
-                succeed: 1552,
                 accepted: 2520,
-            },
-            PcPossibleTestingData {
-                id: format!("contains-no-extra-piece-hold"),
-                generator: || {
-                    let mut binder = PcPossibleBulkExecutorBinder::srs();
-
-                    let board = Board64::from_str("
-                        ######....
-                        ######....
-                        ######....
-                        ######....
-                    ").unwrap();
-                    let height = 4;
-                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
-
-                    binder.pattern = Rc::from(Pattern::try_from(vec![
-                        Permutation(ShapeCounter::one_of_each(), 4),
-                    ]).unwrap());
-
-                    binder.allow_move = AllowMove::Harddrop;
-
-                    binder
-                },
-                succeed: 314,
-                accepted: 840,
-            },
-            PcPossibleTestingData {
-                id: format!("contains-no-extra-piece-no-hold"),
-                generator: || {
-                    let mut binder = PcPossibleBulkExecutorBinder::srs();
-
-                    let board = Board64::from_str("
-                        ######....
-                        ######....
-                        ######....
-                        ######....
-                    ").unwrap();
-                    let height = 4;
-                    binder.clipped_board = ClippedBoard::try_new(board, height).unwrap();
-
-                    binder.pattern = Rc::from(Pattern::try_from(vec![
-                        Permutation(ShapeCounter::one_of_each(), 4),
-                    ]).unwrap());
-
-                    binder.allow_move = AllowMove::Harddrop;
-                    binder.allows_hold = false;
-
-                    binder
-                },
-                succeed: 116,
-                accepted: 840,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 2002),
+                    (AllowMove::Harddrop, true, 789),
+                    (AllowMove::Softdrop, false, 1030),
+                    (AllowMove::Harddrop, false, 177),
+                ],
             },
         ];
 
-        for benchmark in benchmarks {
-            println!("id: {}", benchmark.id);
+        for testing in testings {
+            println!("id: {}", testing.id);
 
-            let binder = (benchmark.generator)();
+            let mut binder = (testing.generator)();
+            binder.clipped_board = testing.clipped_board;
 
-            let results = binder.try_execute().unwrap();
+            for (allow_move, allows_hold, succeed) in testing.expected {
+                binder.allow_move = allow_move;
+                binder.allows_hold = allows_hold;
 
-            assert_eq!(results.count_succeed(), benchmark.succeed);
-            assert_eq!(results.count_accepted(), benchmark.accepted);
+                let start = Instant::now();
+                let results = binder.try_execute().unwrap();
+                let end = start.elapsed();
+                println!("  {}, hold {}: {} ms", allow_move, allows_hold, end.as_millis());
+
+                assert_eq!(results.count_succeed(), succeed);
+                assert_eq!(results.count_accepted(), testing.accepted);
+            }
         }
     }
 }

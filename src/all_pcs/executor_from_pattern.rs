@@ -6,7 +6,7 @@ use crate::all_pcs::{Builder, PcSolutions};
 
 /// A collection of errors that occur when making the executor.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum AllPcsFromPatterExecutorBulkCreationError {
+pub enum AllPcsFromPatternExecutorCreationError {
     #[error("Unexpected the count of board spaces.")]
     UnexpectedBoardSpaces,
     #[error("The pattern is too short to take a PC.")]
@@ -17,7 +17,7 @@ pub enum AllPcsFromPatterExecutorBulkCreationError {
 
 /// The executor to find PC possibles.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub struct AllPcsFromPatternBulkExecutor<'a, T: RotationSystem> {
+pub struct AllPcsFromPatternExecutor<'a, T: RotationSystem> {
     move_rules: &'a MoveRules<'a, T>,
     clipped_board: ClippedBoard,
     pattern: &'a Pattern,
@@ -25,15 +25,15 @@ pub struct AllPcsFromPatternBulkExecutor<'a, T: RotationSystem> {
     allows_hold: bool,
 }
 
-impl<'a, T: RotationSystem> AllPcsFromPatternBulkExecutor<'a, T> {
+impl<'a, T: RotationSystem> AllPcsFromPatternExecutor<'a, T> {
     // TODO desc
     pub fn try_new(
         move_rules: &'a MoveRules<'a, T>,
         clipped_board: ClippedBoard,
         pattern: &'a Pattern,
         allows_hold: bool,
-    ) -> Result<Self, AllPcsFromPatterExecutorBulkCreationError> {
-        use AllPcsFromPatterExecutorBulkCreationError::*;
+    ) -> Result<Self, AllPcsFromPatternExecutorCreationError> {
+        use AllPcsFromPatternExecutorCreationError::*;
 
         if 20 < clipped_board.height() {
             return Err(BoardIsTooHigh);
@@ -83,7 +83,7 @@ mod tests {
     use bitris::prelude::*;
 
     use crate::{ClippedBoard, PatternElement, ShapeCounter};
-    use crate::all_pcs::AllPcsFromPatternBulkExecutor;
+    use crate::all_pcs::AllPcsFromPatternExecutor;
 
     #[test]
     fn small_test_case_pattern() {
@@ -97,7 +97,7 @@ mod tests {
         let pattern = vec![
             PatternElement::One(Shape::O),
         ].try_into().unwrap();
-        let executor = AllPcsFromPatternBulkExecutor::try_new(
+        let executor = AllPcsFromPatternExecutor::try_new(
             &move_rules, clipped_board, &pattern, true,
         ).unwrap();
         let result = executor.execute();
@@ -119,7 +119,7 @@ mod tests {
             let pattern = vec![
                 PatternElement::Fixed(vec![Shape::O, Shape::Z, Shape::T].try_into().unwrap()),
             ].try_into().unwrap();
-            let executor = AllPcsFromPatternBulkExecutor::try_new(
+            let executor = AllPcsFromPatternExecutor::try_new(
                 &move_rules, clipped_board, &pattern, true,
             ).unwrap();
             let result = executor.execute();
@@ -141,7 +141,7 @@ mod tests {
             PatternElement::One(Shape::I),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
         ].try_into().unwrap();
-        let executor = AllPcsFromPatternBulkExecutor::try_new(
+        let executor = AllPcsFromPatternExecutor::try_new(
             &move_rules, clipped_board, &pattern, true,
         ).unwrap();
         let result = executor.execute();
@@ -162,7 +162,7 @@ mod tests {
             PatternElement::One(Shape::I),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 3),
         ].try_into().unwrap();
-        let executor = AllPcsFromPatternBulkExecutor::try_new(
+        let executor = AllPcsFromPatternExecutor::try_new(
             &move_rules, clipped_board, &pattern, false,
         ).unwrap();
         let result = executor.execute();
@@ -183,7 +183,7 @@ mod tests {
             PatternElement::Factorial(vec![Shape::I, Shape::Z].try_into().unwrap()),
             PatternElement::Permutation(ShapeCounter::one_of_each(), 4),
         ].try_into().unwrap();
-        let executor = AllPcsFromPatternBulkExecutor::try_new(
+        let executor = AllPcsFromPatternExecutor::try_new(
             &move_rules, clipped_board, &pattern, true,
         ).unwrap();
         let result = executor.execute();
@@ -204,7 +204,7 @@ mod tests {
             PatternElement::Factorial(vec![Shape::T, Shape::Z].try_into().unwrap()),
             PatternElement::Factorial(vec![Shape::T, Shape::S].try_into().unwrap()),
         ].try_into().unwrap();
-        let executor = AllPcsFromPatternBulkExecutor::try_new(
+        let executor = AllPcsFromPatternExecutor::try_new(
             &move_rules, clipped_board, &pattern, true,
         ).unwrap();
         let result = executor.execute();

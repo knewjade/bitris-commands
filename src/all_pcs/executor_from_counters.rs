@@ -6,7 +6,7 @@ use crate::all_pcs::{Builder, PcSolutions};
 
 /// A collection of errors that occur when making the executor.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub enum AllPcsFromCountersExecutorBulkCreationError {
+pub enum AllPcsFromCountersExecutorCreationError {
     #[error("Unexpected the count of board spaces.")]
     UnexpectedBoardSpaces,
     #[error("It contains the counter that the dimension is too short to take a PC.")]
@@ -19,21 +19,21 @@ pub enum AllPcsFromCountersExecutorBulkCreationError {
 
 /// The executor to find PC possibles.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
-pub struct AllPcsFromCountersBulkExecutor<'a, T: RotationSystem> {
+pub struct AllPcsFromCountersExecutor<'a, T: RotationSystem> {
     move_rules: &'a MoveRules<'a, T>,
     clipped_board: ClippedBoard,
     shape_counters: &'a Vec<ShapeCounter>,
     spawn_position: BlPosition,
 }
 
-impl<'a, T: RotationSystem> AllPcsFromCountersBulkExecutor<'a, T> {
+impl<'a, T: RotationSystem> AllPcsFromCountersExecutor<'a, T> {
     // TODO desc
     pub fn try_new(
         move_rules: &'a MoveRules<'a, T>,
         clipped_board: ClippedBoard,
         shape_counters: &'a Vec<ShapeCounter>,
-    ) -> Result<Self, AllPcsFromCountersExecutorBulkCreationError> {
-        use AllPcsFromCountersExecutorBulkCreationError::*;
+    ) -> Result<Self, AllPcsFromCountersExecutorCreationError> {
+        use AllPcsFromCountersExecutorCreationError::*;
 
         if 20 < clipped_board.height() {
             return Err(BoardIsTooHigh);
@@ -85,7 +85,7 @@ mod tests {
     use bitris::prelude::*;
 
     use crate::{ClippedBoard, ShapeCounter};
-    use crate::all_pcs::{AllPcsFromCountersBulkExecutor, AllPcsFromCountersExecutorBulkCreationError};
+    use crate::all_pcs::{AllPcsFromCountersExecutor, AllPcsFromCountersExecutorCreationError};
 
     #[test]
     fn small_test_case() {
@@ -99,7 +99,7 @@ mod tests {
         let shape_counters = vec![
             ShapeCounter::one(Shape::O),
         ];
-        let executor = AllPcsFromCountersBulkExecutor::try_new(
+        let executor = AllPcsFromCountersExecutor::try_new(
             &move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
@@ -120,7 +120,7 @@ mod tests {
         let shape_counters = vec![
             ShapeCounter::one_of_each() * 3,
         ];
-        let executor = AllPcsFromCountersBulkExecutor::try_new(
+        let executor = AllPcsFromCountersExecutor::try_new(
             &move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
@@ -142,7 +142,7 @@ mod tests {
         let shape_counters = vec![
             ShapeCounter::from(vec![T, L, J, O, I]) * 3,
         ];
-        let executor = AllPcsFromCountersBulkExecutor::try_new(
+        let executor = AllPcsFromCountersExecutor::try_new(
             &move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
@@ -163,7 +163,7 @@ mod tests {
         let shape_counters = vec![
             ShapeCounter::one_of_each(),
         ];
-        let executor = AllPcsFromCountersBulkExecutor::try_new(
+        let executor = AllPcsFromCountersExecutor::try_new(
             &move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
@@ -185,7 +185,7 @@ mod tests {
         let shape_counters = vec![
             ShapeCounter::one_of_each() - S - Z,
         ];
-        let executor = AllPcsFromCountersBulkExecutor::try_new(
+        let executor = AllPcsFromCountersExecutor::try_new(
             &move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
@@ -208,7 +208,7 @@ mod tests {
             ShapeCounter::from(vec![S, T, L]),
             ShapeCounter::from(vec![Z, T, J]),
         ];
-        let executor = AllPcsFromCountersBulkExecutor::try_new(
+        let executor = AllPcsFromCountersExecutor::try_new(
             &move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
@@ -229,7 +229,7 @@ mod tests {
         let shape_counters = vec![
             ShapeCounter::one_of_each() * 10,
         ];
-        let executor = AllPcsFromCountersBulkExecutor::try_new(
+        let executor = AllPcsFromCountersExecutor::try_new(
             &move_rules, clipped_board, &shape_counters,
         ).unwrap();
         let result = executor.execute();
@@ -249,8 +249,8 @@ mod tests {
             ShapeCounter::one_of_each(),
         ];
         assert_eq!(
-            AllPcsFromCountersBulkExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
-            AllPcsFromCountersExecutorBulkCreationError::UnexpectedBoardSpaces,
+            AllPcsFromCountersExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
+            AllPcsFromCountersExecutorCreationError::UnexpectedBoardSpaces,
         );
     }
 
@@ -269,8 +269,8 @@ mod tests {
             ShapeCounter::one(Shape::O),
         ];
         assert_eq!(
-            AllPcsFromCountersBulkExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
-            AllPcsFromCountersExecutorBulkCreationError::ShortCounterDimension,
+            AllPcsFromCountersExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
+            AllPcsFromCountersExecutorCreationError::ShortCounterDimension,
         );
     }
 
@@ -282,8 +282,8 @@ mod tests {
             ShapeCounter::one_of_each() * 10,
         ];
         assert_eq!(
-            AllPcsFromCountersBulkExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
-            AllPcsFromCountersExecutorBulkCreationError::BoardIsTooHigh,
+            AllPcsFromCountersExecutor::try_new(&move_rules, clipped_board, &shape_counters).unwrap_err(),
+            AllPcsFromCountersExecutorCreationError::BoardIsTooHigh,
         );
     }
 }

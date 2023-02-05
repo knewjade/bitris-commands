@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::{ClippedBoard, Pattern, ShapeOrder, ShapeSequence};
 use crate::internals::FuzzyShapeOrder;
 use crate::pc_possible::{Buffer, ExecuteInstruction, PcResults, VerticalParity};
-use crate::pc_possible::bulk_executor::ExecuteInstruction::Continue;
+use crate::pc_possible::executor_bulk::ExecuteInstruction::Continue;
 
 /// Dataset for detecting the same state during PC possible search.
 /// The block counts and height on the board can determine the search depth. (Placed pieces will change the block counts.)

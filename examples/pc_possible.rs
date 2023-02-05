@@ -7,7 +7,7 @@ use bitris_commands::pc_possible::*;
 use bitris_commands::prelude::*;
 
 // Finds a PC with SRS.
-fn srs() {
+fn single_with_srs() {
     // Makes a binder with SRS. The rotation system changes require the re-making of the binder because of the type system.
     // Default values are already set in Binder. Please check the documentation of `PcPossibleExecutorBinder::default()` for details.
     let mut binder = PcPossibleExecutorBinder::srs();
@@ -215,7 +215,7 @@ fn use_the_executor_directly() {
 }
 
 fn main() {
-    srs();
+    single_with_srs();
     bulk_with_srs();
     bulk_using_early_stopping();
     customized_kick();

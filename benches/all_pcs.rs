@@ -9,7 +9,7 @@ use bitris_commands::prelude::*;
 fn all_pcs_from_counters(data: &AllPcsFromShapeCounterBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
-    let executor = all_pcs::AllPcsFromCountersBulkExecutor::try_new(
+    let executor = all_pcs::AllPcsFromCountersExecutor::try_new(
         &move_rules, clipped_board, &data.shape_counters,
     ).unwrap();
     let result = executor.execute();
@@ -20,7 +20,7 @@ fn all_pcs_from_counters(data: &AllPcsFromShapeCounterBenchmarkData) {
 fn all_pcs_from_pattern(data: &AllPcsFromPatternBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
-    let executor = all_pcs::AllPcsFromPatternBulkExecutor::try_new(
+    let executor = all_pcs::AllPcsFromPatternExecutor::try_new(
         &move_rules, clipped_board, &data.pattern, data.allows_hold,
     ).unwrap();
     let result = executor.execute();

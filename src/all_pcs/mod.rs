@@ -1,11 +1,19 @@
 pub(crate) use aggregator::*;
+pub use binder::*;
+pub use binder_from_counters::*;
+pub use binder_from_pattern::*;
 pub(crate) use builder::*;
-pub use bulk_executor_from_counters::*;
-pub use bulk_executor_from_pattern::*;
+pub use executor_from_counters::*;
+pub use executor_from_pattern::*;
 pub(crate) use nodes::*;
+pub use pc_solutions::*;
 
 mod aggregator;
+mod binder;
+mod binder_from_counters;
+mod binder_from_pattern;
 mod builder;
-mod bulk_executor_from_pattern;
-mod bulk_executor_from_counters;
+mod executor_from_pattern;
+mod executor_from_counters;
 mod nodes;
+mod pc_solutions;
