@@ -98,7 +98,7 @@ impl IntoIterator for BitShapes {
 }
 
 /// A collection of errors that occur when making `BitShapes`.
-#[derive(Error, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Error, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum BitShapesCreationError {
     #[error("The shapes are too long. It supports up to 22 shapes.")]
     TooManyShapes(usize),

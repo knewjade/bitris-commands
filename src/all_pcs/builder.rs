@@ -65,13 +65,8 @@ impl Builder {
         available: ShapeCounter,
         width: usize,
     ) -> Self {
-        let board = clipped_board.board();
-        let height = clipped_board.height() as usize;
-        let placed_pieces: Vec<PlacedPiece> = PlacedPiece::make_canonical_all_iter(height)
+        let placed_pieces: Vec<PlacedPiece> = PlacedPiece::make_canonical_on_board_iter(clipped_board.board(), clipped_board.height() as usize)
             .filter(|placed_piece| 0 < available[placed_piece.piece.shape])
-            .filter(|it| {
-                it.locations().iter().all(|&location| board.is_free_at(location))
-            })
             .collect();
         Self::new(clipped_board, placed_pieces, available, width)
     }

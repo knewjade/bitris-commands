@@ -23,4 +23,14 @@ impl PcSolutions {
     pub fn len(&self) -> usize {
         self.placed_pieces.len()
     }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.placed_pieces.is_empty()
+    }
+
+    #[inline]
+    pub fn first(&self) -> Option<&Vec<PlacedPiece>> {
+        self.placed_pieces.first()
+    }
 }

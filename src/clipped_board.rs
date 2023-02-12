@@ -9,7 +9,7 @@ pub struct ClippedBoard {
 }
 
 /// A collection of errors that occur when making clipped board.
-#[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Error, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum ClippedBoardCreationError {
     #[error("Height must be greater than 0.")]
     HeightIsZero,

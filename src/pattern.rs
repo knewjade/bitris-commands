@@ -132,7 +132,7 @@ pub struct Pattern {
 }
 
 /// A collection of errors that occur when making the pattern.
-#[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Error, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum PatternCreationError {
     #[error("This does not have shape sequences.")]
     NoShapeSequences,

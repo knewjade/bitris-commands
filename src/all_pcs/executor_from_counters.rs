@@ -5,7 +5,7 @@ use crate::{ClippedBoard, ShapeCounter};
 use crate::all_pcs::{Builder, PcSolutions};
 
 /// A collection of errors that occur when making the executor.
-#[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Error, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum AllPcsFromCountersExecutorCreationError {
     #[error("Unexpected the count of board spaces.")]
     UnexpectedBoardSpaces,
