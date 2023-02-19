@@ -1,3 +1,5 @@
+use std::fmt;
+
 use bitris::prelude::*;
 use fxhash::FxHashSet;
 use thiserror::Error;
@@ -45,7 +47,7 @@ fn validate_board(clipped: &ClippedBoard) -> bool {
 
 
 /// A collection of errors that occur when making the executor.
-#[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Error, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum PcPossibleExecutorBulkCreationError {
     #[error("Unexpected the count of board spaces.")]
     UnexpectedBoardSpaces,
@@ -53,6 +55,22 @@ pub enum PcPossibleExecutorBulkCreationError {
     ShortPatternDimension,
     #[error("Board height exceeds the upper limit. Up to 56 are supported.")]
     BoardIsTooHigh,
+}
+
+/// A collection of errors that occur when making the executor.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
+pub enum PcPossibleAlgorithm {
+    #[default] AllPcs,
+    Simulation,
+}
+
+impl fmt::Display for PcPossibleAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PcPossibleAlgorithm::AllPcs => write!(f, "All PCs"),
+            PcPossibleAlgorithm::Simulation => write!(f, "Simulation"),
+        }
+    }
 }
 
 /// The executor to find PC possibles.
@@ -64,6 +82,7 @@ pub struct PcPossibleBulkExecutor<'a, T: RotationSystem> {
     allows_hold: bool,
     has_extra_shapes: bool,
     spawn_position: BlPosition,
+    algorithm: PcPossibleAlgorithm,
 }
 
 impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
@@ -74,8 +93,8 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// ```
     /// use std::str::FromStr;
     /// use bitris::prelude::*;
-    /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
-    /// use bitris_commands::pc_possible::PcPossibleBulkExecutor;
+    /// use bitris_commands::prelude::*;
+    /// use bitris_commands::pc_possible::*;
     ///
     /// let move_rules = MoveRules::srs(AllowMove::Softdrop);
     ///
@@ -96,7 +115,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     ///
     /// let allows_hold = true;
     ///
-    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
+    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold, PcPossibleAlgorithm::AllPcs)
     ///     .expect("Failed to create an executor");
     ///
     /// let results = executor.execute();
@@ -109,6 +128,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         clipped_board: ClippedBoard,
         pattern: &'a Pattern,
         allows_hold: bool,
+        algorithm: PcPossibleAlgorithm,
     ) -> Result<Self, PcPossibleExecutorBulkCreationError> {
         use PcPossibleExecutorBulkCreationError::*;
 
@@ -132,12 +152,23 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
         // Spawn over the top of the well to avoid getting stuck.
         let spawn_position = bl(5, clipped_board.height() as i32 + 4);
 
-        Ok(Self { move_rules, clipped_board, pattern, allows_hold, has_extra_shapes, spawn_position })
+        Ok(Self {
+            move_rules,
+            clipped_board,
+            pattern,
+            allows_hold,
+            has_extra_shapes,
+            spawn_position,
+            algorithm,
+        })
     }
 
     /// Start the search for PC possible in bulk.
     pub fn execute(&self) -> PcResults {
-        self.execute_with_early_stopping(move |_| Continue)
+        match self.algorithm {
+            PcPossibleAlgorithm::Simulation => self.execute_with_early_stopping(move |_| Continue),
+            PcPossibleAlgorithm::AllPcs => self.execute_with_early_stopping(move |_| Continue),
+        }
     }
 
     /// Start the search for PC possible in bulk with early stopping.
@@ -145,8 +176,8 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     /// ```
     /// use std::str::FromStr;
     /// use bitris::prelude::*;
-    /// use bitris_commands::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
-    /// use bitris_commands::pc_possible::{ExecuteInstruction, PcPossibleBulkExecutor};
+    /// use bitris_commands::prelude::*;
+    /// use bitris_commands::pc_possible::*;
     ///
     /// let move_rules = MoveRules::srs(AllowMove::Softdrop);
     ///
@@ -165,7 +196,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
     ///
     /// let allows_hold = false;
     ///
-    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold)
+    /// let executor = PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, allows_hold, PcPossibleAlgorithm::AllPcs)
     ///     .expect("Failed to create an executor");
     ///
     /// // Stops after 10 failures.
@@ -343,7 +374,7 @@ mod tests {
     use bitris::prelude::*;
 
     use crate::{BitShapes, ClippedBoard, Pattern, PatternElement, ShapeCounter, ShapeSequence};
-    use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
+    use crate::pc_possible::{PcPossibleAlgorithm, PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
 
     #[test]
     fn success_rate_contain_filled_line() {
@@ -363,7 +394,7 @@ mod tests {
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         let executor = PcPossibleBulkExecutor::try_new(
-            &move_rules, clipped_board, &pattern, true,
+            &move_rules, clipped_board, &pattern, true, PcPossibleAlgorithm::AllPcs,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result.count_succeed(), 90);
@@ -394,7 +425,7 @@ mod tests {
                 Fixed(BitShapes::try_from(vec![J, O, I]).unwrap()),
             ]).unwrap();
             let executor = PcPossibleBulkExecutor::try_new(
-                &move_rules, clipped_board, &single_pattern, true,
+                &move_rules, clipped_board, &single_pattern, true, PcPossibleAlgorithm::AllPcs,
             ).unwrap();
             assert!(executor.execute_single());
         }
@@ -403,7 +434,7 @@ mod tests {
                 Fixed(BitShapes::try_from(vec![J, T, I]).unwrap()),
             ]).unwrap();
             let executor = PcPossibleBulkExecutor::try_new(
-                &move_rules, clipped_board, &single_pattern, true,
+                &move_rules, clipped_board, &single_pattern, true, PcPossibleAlgorithm::AllPcs,
             ).unwrap();
             assert!(!executor.execute_single());
         }
@@ -423,7 +454,7 @@ mod tests {
         ]).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true, PcPossibleAlgorithm::AllPcs).unwrap_err(),
             PcPossibleExecutorBulkCreationError::UnexpectedBoardSpaces,
         );
     }
@@ -441,7 +472,7 @@ mod tests {
         ]).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true, PcPossibleAlgorithm::AllPcs).unwrap_err(),
             PcPossibleExecutorBulkCreationError::ShortPatternDimension,
         );
     }
@@ -463,7 +494,7 @@ mod tests {
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
 
         let executor = PcPossibleBulkExecutor::try_new(
-            &move_rules, clipped_board, &pattern, true,
+            &move_rules, clipped_board, &pattern, true, PcPossibleAlgorithm::AllPcs,
         ).unwrap();
         let result = executor.execute();
         assert_eq!(result.count_succeed(), 1);
@@ -488,7 +519,7 @@ mod tests {
         ].repeat((height / 4) as usize + 2)).unwrap();
         let move_rules = MoveRules::srs(AllowMove::Softdrop);
         assert_eq!(
-            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true).unwrap_err(),
+            PcPossibleBulkExecutor::try_new(&move_rules, clipped_board, &pattern, true, PcPossibleAlgorithm::AllPcs).unwrap_err(),
             PcPossibleExecutorBulkCreationError::BoardIsTooHigh,
         );
     }
