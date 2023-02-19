@@ -338,6 +338,35 @@ mod tests {
                     (AllowMove::Harddrop, false, 177),
                 ],
             },
+            TestingData {
+                id: format!("height-8-extra"),
+                clipped_board: ClippedBoard::try_new(Board64::from_str("
+                    ..........
+                    ####....##
+                    ###....###
+                    ###....###
+                    ###....###
+                    ###....###
+                    ###....###
+                    ###....###
+                    ##....####
+                ").unwrap(), 8).unwrap(),
+                generator: || {
+                    let mut binder = PcPossibleBulkExecutorBinder::srs();
+
+                    binder.pattern = Rc::from(Pattern::try_from(vec![
+                        Permutation(ShapeCounter::one_of_each(), 2),
+                        Factorial(ShapeCounter::one_of_each()),
+                    ]).unwrap());
+
+                    binder
+                },
+                accepted: 211680,
+                expected: vec![
+                    (AllowMove::Softdrop, true, 210152),
+                    (AllowMove::Harddrop, true, 9458),
+                ],
+            },
         ];
 
         for testing in testings {
@@ -350,13 +379,36 @@ mod tests {
                 binder.allow_move = allow_move;
                 binder.allows_hold = allows_hold;
 
-                let start = Instant::now();
-                let results = binder.try_execute().unwrap();
-                let end = start.elapsed();
-                println!("  {}, hold {}: {} ms", allow_move, allows_hold, end.as_millis());
+                print!("  {}, hold {}: ", allow_move, allows_hold);
 
-                assert_eq!(results.count_succeed(), succeed);
-                assert_eq!(results.count_accepted(), testing.accepted);
+                {
+                    let algorithm = PcPossibleAlgorithm::AllPcs;
+                    binder.algorithm = algorithm;
+
+                    let start = Instant::now();
+                    let results = binder.try_execute().unwrap();
+                    let end = start.elapsed();
+
+                    print!("[{}] {} ms  ", algorithm, end.as_millis());
+
+                    assert_eq!(results.count_succeed(), succeed);
+                    assert_eq!(results.count_accepted(), testing.accepted);
+                }
+                // {
+                //     let algorithm = PcPossibleAlgorithm::Simulation;
+                //     binder.algorithm = algorithm;
+                //
+                //     let start = Instant::now();
+                //     let results = binder.try_execute().unwrap();
+                //     let end = start.elapsed();
+                //
+                //     print!("[{}] {} ms", algorithm, end.as_millis());
+                //
+                //     assert_eq!(results.count_succeed(), succeed);
+                //     assert_eq!(results.count_accepted(), testing.accepted);
+                // }
+
+                println!();
             }
         }
     }

@@ -4,6 +4,7 @@ use std::str::FromStr;
 use criterion::{black_box, Criterion, criterion_group, criterion_main};
 
 use bitris_commands::pc_possible;
+use bitris_commands::pc_possible::*;
 use bitris_commands::prelude::*;
 
 #[inline(always)]
@@ -11,7 +12,7 @@ fn pc_possible(data: &PcPossibleBenchmarkData) {
     let move_rules = MoveRules::srs(data.allow_move);
     let clipped_board = ClippedBoard::try_new(data.board, data.height).unwrap();
     let executor = pc_possible::PcPossibleBulkExecutor::try_new(
-        &move_rules, clipped_board, &data.pattern, data.allows_hold,
+        &move_rules, clipped_board, &data.pattern, data.allows_hold, PcPossibleAlgorithm::AllPcs,
     ).unwrap();
     let result = executor.execute();
     assert_eq!(result.count_succeed(), data.expected);
@@ -97,6 +98,20 @@ fn bench_pc_possibles(c: &mut Criterion) {
             allow_move: AllowMove::Softdrop,
             allows_hold: true,
             expected: 7,
+        },
+        PcPossibleBenchmarkData {
+            id: format!("1st-cycle-partial-pt2"),
+            board: Board64::blank(),
+            height: 4,
+            pattern: Rc::from(Pattern::try_from(vec![
+                Fixed(BitShapes::try_from(vec![
+                    S, S, Z, O, L, L, S, J, O, Z,
+                ]).unwrap()),
+                Wildcard,
+            ]).unwrap()),
+            allow_move: AllowMove::Softdrop,
+            allows_hold: true,
+            expected: 5,
         },
         PcPossibleBenchmarkData {
             id: format!("grace-system"),
