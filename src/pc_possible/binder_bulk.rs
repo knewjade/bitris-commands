@@ -4,7 +4,7 @@ use bitris::prelude::*;
 use bitris::srs::SrsKickTable;
 
 use crate::{ClippedBoard, Pattern, PatternElement, ShapeCounter};
-use crate::pc_possible::{ExecuteInstruction, PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError, PcResults};
+use crate::pc_possible::{ExecuteInstruction, PcPossibleAlgorithm, PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError, PcResults};
 
 /// The binder to hold and tie settings for `PcPossibleBulkExecutor`.
 #[derive(Clone, PartialEq, PartialOrd, Hash, Debug)]
@@ -14,6 +14,7 @@ pub struct PcPossibleBulkExecutorBinder<T: RotationSystem> {
     pub clipped_board: ClippedBoard,
     pub pattern: Rc<Pattern>,
     pub allows_hold: bool,
+    pub algorithm: PcPossibleAlgorithm,
 }
 
 impl PcPossibleBulkExecutorBinder<SrsKickTable> {
@@ -30,6 +31,7 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
         clipped_board: ClippedBoard,
         pattern: Rc<Pattern>,
         allows_hold: bool,
+        algorithm: PcPossibleAlgorithm,
     ) -> Self {
         Self {
             rotation_system,
@@ -37,6 +39,7 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
             clipped_board,
             pattern,
             allows_hold,
+            algorithm,
         }
     }
 
@@ -49,6 +52,7 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
     ///   + height: 4 lines
     ///   + pattern: factorial of all shapes (like `*p7`)
     ///   + allows hold: yes
+    ///   + algorithm: all pcs
     pub fn default(rotation_system: Rc<T>) -> Self {
         Self {
             rotation_system,
@@ -58,6 +62,7 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
                 PatternElement::Factorial(ShapeCounter::one_of_each()),
             ]).unwrap()),
             allows_hold: true,
+            algorithm: PcPossibleAlgorithm::AllPcs,
         }
     }
 
@@ -81,6 +86,7 @@ impl<T: RotationSystem> PcPossibleBulkExecutorBinder<T> {
             self.clipped_board,
             self.pattern.as_ref(),
             self.allows_hold,
+            self.algorithm,
         )
     }
 }

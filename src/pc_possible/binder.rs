@@ -6,7 +6,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{ClippedBoard, Pattern, PatternCreationError, PatternElement, ShapeOrder};
-use crate::pc_possible::{PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
+use crate::pc_possible::{PcPossibleAlgorithm, PcPossibleBulkExecutor, PcPossibleExecutorBulkCreationError};
 
 /// A collection of errors that occur when making the executor.
 #[derive(Error, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -105,6 +105,7 @@ impl<T: RotationSystem> PcPossibleExecutorBinder<T> {
             self.clipped_board,
             pattern,
             self.allows_hold,
+            PcPossibleAlgorithm::Simulation,
         )
     }
 }
