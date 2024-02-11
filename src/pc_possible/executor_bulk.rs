@@ -338,7 +338,7 @@ impl<'a, T: RotationSystem> PcPossibleBulkExecutor<'a, T> {
             if !visited_states.insert(SearchingState {
                 board,
                 height,
-                first: next_cursor.first().map(|&shape| shape),
+                first: next_cursor.peek_first().map(|&shape| shape),
             }) {
                 continue;
             }

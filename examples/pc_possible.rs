@@ -207,6 +207,7 @@ fn use_the_executor_directly() {
         clipped_board,
         &pattern,
         allows_hold,
+        PcPossibleAlgorithm::AllPcs,
     ).expect("Failed to make an executor");
 
     let results = executor.execute();
