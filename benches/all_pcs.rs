@@ -53,7 +53,7 @@ fn bench_all_pcs_from_order(c: &mut Criterion) {
     use Shape::*;
     let benchmarks = vec![
         AllPcsFromOrderBenchmarkData {
-            id: format!("pco-tlj"),
+            id: "pco-tlj".to_string(),
             board: Board64::from_str(
                 "
                 ####....##
@@ -68,7 +68,7 @@ fn bench_all_pcs_from_order(c: &mut Criterion) {
             expected: 1,
         },
         AllPcsFromOrderBenchmarkData {
-            id: format!("piece7-hold"),
+            id: "piece7-hold".to_string(),
             board: Board64::from_str("
                 ####......
                 ####......
@@ -82,7 +82,7 @@ fn bench_all_pcs_from_order(c: &mut Criterion) {
             expected: 11,
         },
         AllPcsFromOrderBenchmarkData {
-            id: format!("piece6-no-hold"),
+            id: "piece6-no-hold".to_string(),
             board: Board64::from_str("
                 ####......
                 ####......
@@ -118,7 +118,7 @@ struct AllPcsFromCounterBenchmarkData {
 fn bench_all_pcs_from_counters(c: &mut Criterion) {
     let benchmarks = vec![
         AllPcsFromCounterBenchmarkData {
-            id: format!("pco-wildcard3"),
+            id: "pco-wildcard3".to_string(),
             board: Board64::from_str(
                 "
                 ####....##
@@ -134,7 +134,7 @@ fn bench_all_pcs_from_counters(c: &mut Criterion) {
             expected: 28,
         },
         AllPcsFromCounterBenchmarkData {
-            id: format!("wildcard3"),
+            id: "wildcard3".to_string(),
             board: Board64::from_str(
                 "
                 ...#######
@@ -150,7 +150,7 @@ fn bench_all_pcs_from_counters(c: &mut Criterion) {
             expected: 79,
         },
         AllPcsFromCounterBenchmarkData {
-            id: format!("wildcard6"),
+            id: "wildcard6".to_string(),
             board: Board64::from_str(
                 "
                 ......####
@@ -190,7 +190,7 @@ fn bench_all_pcs_from_pattern(c: &mut Criterion) {
     use Shape::*;
     let benchmarks = vec![
         AllPcsFromPatternBenchmarkData {
-            id: format!("pco-(i,*p4)"),
+            id: "pco-(i,*p4)".to_string(),
             board: Board64::from_str(
                 "
                 ###.....##
@@ -208,7 +208,7 @@ fn bench_all_pcs_from_pattern(c: &mut Criterion) {
             expected: 63,
         },
         AllPcsFromPatternBenchmarkData {
-            id: format!("pco-([TOJ]!,*p4)"),
+            id: "pco-([TOJ]!,*p4)".to_string(),
             board: Board64::from_str(
                 "
                 ####......
