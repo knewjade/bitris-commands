@@ -11,7 +11,7 @@ Eventually, we plan to make documentation and samples available to users.
 
 # Usage/Documents
 
-Now you can refer to the `cargo doc` and [some examples](examples).
+Now you can refer to the `cargo doc` and some examples.
 
 The examples are like a startup guide and exhaustive.
 Then, when more detail is needed, we recommend generating crate documentation.
@@ -25,5 +25,3 @@ Eventually, when crate documentation is available on the web, we plan to organiz
 A pattern can be used to process multiple piece orders at once.
 The results can then be aggregated to get the PC success rate.
 This feature was called `percent` in solution-finder.
-
-- [Example](examples/pc_possible.rs)
