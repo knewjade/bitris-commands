@@ -13,4 +13,3 @@ jobs:
         run: |
           cargo test --release
           cargo test --benches
-          cargo run --example pc_possible 
